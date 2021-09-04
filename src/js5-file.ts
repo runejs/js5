@@ -281,6 +281,10 @@ export class Js5File {
         this._name = getFileNameForHash(nameHash);
     }
 
+    public get name(): string {
+        return this._name;
+    }
+
     public get data(): ByteBuffer {
         return this._data;
     }

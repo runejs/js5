@@ -1,14 +1,16 @@
-import { ByteBuffer } from '@runejs/core/buffer';
 import { Js5Store } from './js5-store';
 import { Js5FileGroup } from './js5-file-group';
 import { Js5File } from './js5-file';
 import { logger } from '@runejs/core';
+import { ArchiveConfig, getArchiveConfig } from './config';
+import { hashFileName } from './hash/name-hash';
 
 
 export class Js5Archive extends Js5File {
 
     public readonly js5Store: Js5Store;
     public readonly groups: Map<string, Js5FileGroup>;
+    public readonly config: ArchiveConfig;
 
     private _format: number;
     private _filesNamed: boolean;
@@ -17,6 +19,7 @@ export class Js5Archive extends Js5File {
         super(index, archive);
         this.js5Store = js5Store;
         this.groups = new Map<string, Js5FileGroup>();
+        this.config = getArchiveConfig(index);
     }
 
     public decode(): void {
@@ -24,7 +27,12 @@ export class Js5Archive extends Js5File {
             return;
         }
 
-        logger.info(`Decoding archive ${this.index}...`);
+        if(this.config?.name) {
+            this._nameHash = hashFileName(this.config.name);
+            this._name = this.config.name;
+        }
+
+        logger.info(`Decoding archive ${this.name}...`);
 
         this.extractPackedFile(this.js5Store.packedMainIndexChannel, this.js5Store.packedDataChannel);
 
