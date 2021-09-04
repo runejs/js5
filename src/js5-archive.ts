@@ -2,7 +2,7 @@ import { Js5Store } from './js5-store';
 import { Js5FileGroup } from './js5-file-group';
 import { Js5File } from './js5-file';
 import { logger } from '@runejs/core';
-import { ArchiveConfig, getArchiveConfig } from './config';
+import { ArchiveInfo } from './config/archive-config';
 import { hashFileName } from './hash/name-hash';
 
 
@@ -10,26 +10,24 @@ export class Js5Archive extends Js5File {
 
     public readonly js5Store: Js5Store;
     public readonly groups: Map<string, Js5FileGroup>;
-    public readonly config: ArchiveConfig;
+    public readonly config: ArchiveInfo;
 
     private _format: number;
     private _filesNamed: boolean;
 
-    public constructor(js5Store: Js5Store, index: number, archive?: Js5Archive) {
+    public constructor(js5Store: Js5Store, index: string | number, archive?: Js5Archive) {
         super(index, archive);
         this.js5Store = js5Store;
         this.groups = new Map<string, Js5FileGroup>();
-        this.config = getArchiveConfig(index);
+        this.config = js5Store.archiveConfig.get(this.index);
     }
 
     public decode(): void {
+        this._nameHash = hashFileName(this.config.name);
+        this._name = this.config.name;
+
         if(this.index === '255') {
             return;
-        }
-
-        if(this.config?.name) {
-            this._nameHash = hashFileName(this.config.name);
-            this._name = this.config.name;
         }
 
         logger.info(`Decoding archive ${this.name}...`);
