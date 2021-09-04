@@ -106,6 +106,12 @@ export class Js5Archive extends Js5File {
                 }
             }
         }
+
+        if(this.groups.size) {
+            for(const [ , group ] of this.groups) {
+                group?.decode();
+            }
+        }
     }
 
     /**

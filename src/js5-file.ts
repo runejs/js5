@@ -243,6 +243,11 @@ export class Js5File {
         return this._data;
     }
 
+    public setData(data: ByteBuffer, compressed: boolean): void {
+        this._data = data;
+        this._compressed = compressed;
+    }
+
     public get numericIndex(): number {
         return Number(this.index);
     }
