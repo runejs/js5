@@ -1,7 +1,6 @@
 import { Js5Archive } from './js5-archive';
 import { Compression } from './compression/file-compression';
 import { ByteBuffer } from '@runejs/core/buffer';
-import { getFileNameForHash } from './hash/name-hash';
 import Bzip2 from './compression/bzip2';
 import Gzip from './compression/gzip';
 import Xtea from './compression/xtea';
@@ -278,7 +277,7 @@ export class Js5File {
 
     public set nameHash(nameHash: number) {
         this._nameHash = nameHash;
-        this._name = getFileNameForHash(nameHash);
+        this._name = this.archive?.js5Store?.archiveConfig.getFileName(nameHash);
     }
 
     public get name(): string {

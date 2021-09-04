@@ -3,7 +3,6 @@ import { Js5FileGroup } from './js5-file-group';
 import { Js5File } from './js5-file';
 import { logger } from '@runejs/core';
 import { ArchiveInfo } from './config/archive-config';
-import { hashFileName } from './hash/name-hash';
 
 
 export class Js5Archive extends Js5File {
@@ -19,11 +18,11 @@ export class Js5Archive extends Js5File {
         super(index, archive);
         this.js5Store = js5Store;
         this.groups = new Map<string, Js5FileGroup>();
-        this.config = js5Store.archiveConfig.get(this.index);
+        this.config = js5Store.archiveConfig.getArchiveInfo(this.index);
     }
 
     public decode(): void {
-        this._nameHash = hashFileName(this.config.name);
+        this._nameHash = this.js5Store.archiveConfig.hashFileName(this.config.name);
         this._name = this.config.name;
 
         if(this.index === '255') {
