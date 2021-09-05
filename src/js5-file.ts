@@ -1,14 +1,13 @@
-import { Js5Archive } from './js5-archive';
-import { Compression } from './compression/file-compression';
 import { ByteBuffer } from '@runejs/core/buffer';
-import Bzip2 from './compression/bzip2';
-import Gzip from './compression/gzip';
-import Xtea from './compression/xtea';
-import { logger } from '@runejs/core';
+import { Compression, Bzip2, Gzip } from '@runejs/core/compression';
+import { Xtea, XteaKeys } from '@runejs/core/encryption';
+import { Js5Archive } from './js5-archive';
+import { Js5Store } from './js5-store';
 
 
 export class Js5File {
 
+    public readonly store: Js5Store;
     public readonly archive: Js5Archive;
     public readonly index: string;
 
@@ -22,11 +21,19 @@ export class Js5File {
     protected _size: number;
     protected _sector: number;
 
-    public constructor(index: string | number, archive?: Js5Archive) {
-        this.archive = archive;
+    public constructor(index: string | number, store: Js5Store);
+    public constructor(index: string | number, archive: Js5Archive);
+    public constructor(index: string | number, store: Js5Store, archive: Js5Archive);
+    public constructor(index: string | number, arg1: Js5Store | Js5Archive, arg2?: Js5Archive) {
+        if(arg1 instanceof Js5Archive) {
+            this.archive = arg1;
+            this.store = arg1.store;
+        } else {
+            this.store = arg1;
+            this.archive = arg2;
+        }
         this.index = typeof index === 'number' ? String(index) : index;
-        this._data = null;
-        this._compressed = true;
+        this.setData(null, true);
         this._name = '';
     }
 
@@ -78,15 +85,12 @@ export class Js5File {
                 data.put(this.version, 'short');
             }
 
-            this._data = data.flipWriter();
-            this._compressed = true;
-            this._data.readerIndex = 0;
-            this._data.writerIndex = 0;
+            this.setData(data.flipWriter(), true);
             return this._data;
         }
     }
     
-    public decompress(keys?: number[]): ByteBuffer | null {
+    public decompress(): ByteBuffer | null {
         if(!this.compressed) {
             return this._data;
         }
@@ -101,69 +105,99 @@ export class Js5File {
 
         this.compression = compressedData.get('byte', 'unsigned');
         const compressedLength = compressedData.get('int', 'unsigned');
-        let data: ByteBuffer;
 
-        if(Xtea.validKeys(keys)) {
-            // Decode xtea encrypted file
-            const readerIndex = compressedData.readerIndex;
-            let lengthOffset = readerIndex;
-            if(compressedData.length - (compressedLength + readerIndex + 4) >= 2) {
-                lengthOffset += 2;
+        const readerIndex = compressedData.readerIndex;
+        let decodedDataSets: ByteBuffer[] = [];
+
+        if(this.archive?.config?.content?.encryption === 'xtea') {
+            let keySets: XteaKeys[] = [];
+            if(this.name) {
+                const loadedKeys = this.store.config.getXteaKey(this.name, this.store.gameVersion);
+                if(loadedKeys && !Array.isArray(loadedKeys)) {
+                    keySets = [ loadedKeys ];
+                }
             }
-            const decryptedData = Xtea.decrypt(compressedData, keys, compressedData.length - lengthOffset);
-            decryptedData.copy(compressedData, readerIndex, 0);
-            compressedData.readerIndex = readerIndex;
+
+            for(const keys of keySets) {
+                if(!Xtea.validKeys(keys.key)) {
+                    continue;
+                }
+
+                const dataCopy = new ByteBuffer(compressedData.length);
+                compressedData.copy(dataCopy, 0, 0);
+                dataCopy.readerIndex = readerIndex;
+
+                let lengthOffset = readerIndex;
+                if(dataCopy.length - (compressedLength + readerIndex + 4) >= 2) {
+                    lengthOffset += 2;
+                }
+
+                const decryptedData = Xtea.decrypt(dataCopy, keys.key, dataCopy.length - lengthOffset);
+                decryptedData.copy(dataCopy, readerIndex, 0);
+                decodedDataSets.push(dataCopy);
+            }
         }
 
-        if(this.compression === Compression.uncompressed) {
-            // Uncompressed file
-            data = new ByteBuffer(compressedLength);
-            compressedData.copy(data, 0, compressedData.readerIndex, compressedLength);
-            compressedData.readerIndex = (compressedData.readerIndex + compressedLength);
+        if(!decodedDataSets.length) {
+            decodedDataSets = [ compressedData ];
+        }
 
-            if(compressedData.readable >= 2) {
-                this.version = compressedData.get('short', 'unsigned');
-            }
-        } else {
-            // Compressed file
-            const decompressedLength = compressedData.get('int', 'unsigned');
-            if(decompressedLength < 0) {
-                logger.error(`Invalid file length - missing XTEA keys?`);
-                return null;
+        let data: ByteBuffer;
+
+        for(const decodedData of decodedDataSets) {
+            if(data?.length) {
+                break;
             }
 
-            const decompressedData = new ByteBuffer(
-                this.compression === Compression.bzip ? 
-                    decompressedLength : (compressedData.length - compressedData.readerIndex + 2)
-            );
+            decodedData.readerIndex = readerIndex;
 
-            compressedData.copy(decompressedData, 0, compressedData.readerIndex);
+            if(this.compression === Compression.uncompressed) {
+                // Uncompressed file
+                data = new ByteBuffer(compressedLength);
+                decodedData.copy(data, 0, decodedData.readerIndex, compressedLength);
+                decodedData.readerIndex = (decodedData.readerIndex + compressedLength);
 
-            try {
-                data = this.compression === Compression.bzip ?
-                    Bzip2.decompress(decompressedData) : Gzip.decompress(decompressedData);
-
-                compressedData.readerIndex = compressedData.readerIndex + compressedLength;
-
-                if(data.length !== decompressedLength) {
-                    logger.error(`Compression length mismatch`);
-                    return null;
+                if(decodedData.readable >= 2) {
+                    this.version = decodedData.get('short', 'unsigned');
+                }
+            } else {
+                // Compressed file
+                const decompressedLength = decodedData.get('int', 'unsigned');
+                if(decompressedLength < 0) {
+                    // logger.error(`Invalid file length - missing XTEA keys?`);
+                    continue;
                 }
 
-                // Read the file footer
-                if(compressedData.readable >= 2) {
-                    this.version = compressedData.get('short', 'unsigned');
+                const decompressedData = new ByteBuffer(
+                    this.compression === Compression.bzip ?
+                        decompressedLength : (decodedData.length - decodedData.readerIndex + 2)
+                );
+
+                decodedData.copy(decompressedData, 0, decodedData.readerIndex);
+
+                try {
+                    data = this.compression === Compression.bzip ?
+                        Bzip2.decompress(decompressedData) : Gzip.decompress(decompressedData);
+
+                    decodedData.readerIndex = decodedData.readerIndex + compressedLength;
+
+                    if(data.length !== decompressedLength) {
+                        // logger.error(`Compression length mismatch`);
+                        continue;
+                    }
+
+                    // Read the file footer
+                    if(decodedData.readable >= 2) {
+                        this.version = decodedData.get('short', 'unsigned');
+                    }
+                } catch(error) {
+                    // logger.error(error?.message ?? error);
                 }
-            } catch(error) {
-                logger.error(error?.message ?? error);
             }
         }
 
         if(data?.length) {
-            this._data = data;
-            this._compressed = false;
-            this._data.readerIndex = 0;
-            this._data.writerIndex = 0;
+            this.setData(data, false);
             return this._data;
         }
 
@@ -235,17 +269,20 @@ export class Js5File {
             }
         } while(remaining > 0);
 
-        data.readerIndex = 0;
-        this._data = data;
-        this._data.readerIndex = 0;
-        this._data.writerIndex = 0;
-        this._compressed = true;
+        this.setData(data, true);
         return this._data;
     }
 
     public setData(data: ByteBuffer, compressed: boolean): void {
-        this._data = data;
+        if(data?.length) {
+            data.readerIndex = 0;
+            data.writerIndex = 0;
+            this._data = data;
+        } else {
+            this._data = null;
+        }
         this._compressed = compressed;
+        this._size = data?.length ?? 0;
     }
 
     public get numericIndex(): number {
@@ -282,7 +319,7 @@ export class Js5File {
 
     public set nameHash(nameHash: number) {
         this._nameHash = nameHash;
-        this._name = this.archive?.js5Store?.archiveConfig.getFileName(nameHash);
+        this._name = this.archive?.store?.config.getFileName(nameHash);
     }
 
     public get name(): string {

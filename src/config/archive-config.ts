@@ -2,13 +2,18 @@ import * as fs from 'fs';
 import path from 'path';
 import JSON5 from 'json5';
 import { logger } from '@runejs/core';
+import { Xtea, XteaKeys } from '@runejs/core/encryption';
 
 
 export type ArchiveContentType = 'groups' | 'files';
 
 
+export type FileEncryptionType = 'none' | 'xtea';
+
+
 export interface ArchiveContentConfig {
     type?: ArchiveContentType;
+    encryption?: FileEncryptionType;
     fileExtension?: string;
     saveFileNames?: boolean;
     defaultFileNames?: { [key: string]: number };
@@ -27,13 +32,41 @@ export interface ArchiveInfo {
 export class ArchiveConfig {
 
     public readonly configPath: string;
-    public readonly configs: Map<string, ArchiveInfo>;
-    public readonly fileNames: Map<number, string>;
+
+    private readonly configs: Map<string, ArchiveInfo>;
+    private readonly fileNames: Map<number, string>;
+    private readonly xteaKeys: Map<string, XteaKeys[]>;
 
     public constructor(configPath: string) {
         this.configPath = configPath;
         this.configs = new Map<string, ArchiveInfo>();
         this.fileNames = new Map<number, string>();
+        this.xteaKeys = new Map<string, XteaKeys[]>();
+    }
+
+    public getXteaKey(fileName: string): XteaKeys[] | null;
+    public getXteaKey(fileName: string, gameVersion: number): XteaKeys | null;
+    public getXteaKey(fileName: string, gameVersion?: number | undefined): XteaKeys | XteaKeys[] | null;
+    public getXteaKey(fileName: string, gameVersion?: number | undefined): XteaKeys | XteaKeys[] | null {
+        if(!this.xteaKeys.size) {
+            this.loadXteaKeys();
+        }
+
+        if(!this.xteaKeys.size) {
+            logger.error(`XTEA keys could not be loaded.`);
+            return null;
+        }
+
+        const keySets = this.xteaKeys.get(fileName);
+        if(!keySets) {
+            return null;
+        }
+
+        if(gameVersion !== undefined) {
+            return keySets.find(keySet => keySet.gameVersion === gameVersion) ?? null;
+        }
+
+        return keySets;
     }
 
     public getArchiveInfo(archiveIndex: string): ArchiveInfo {
@@ -81,6 +114,10 @@ export class ArchiveConfig {
         }
 
         return this.fileNames.get(nameHash) ?? undefined;
+    }
+
+    public loadXteaKeys(): void {
+        Xtea.loadKeys(path.join(this.configPath, 'xtea'));
     }
 
     public loadFileNames(): void {

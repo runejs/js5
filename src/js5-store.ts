@@ -1,29 +1,41 @@
-import { Js5Archive } from './js5-archive';
-import { ByteBuffer } from '@runejs/core/buffer';
 import path from 'path';
 import * as fs from 'fs';
 import { logger } from '@runejs/core';
+import { ByteBuffer } from '@runejs/core/buffer';
+import { Js5Archive } from './js5-archive';
 import { ArchiveConfig } from './config/archive-config';
 
 
 export class Js5Store {
 
-    public readonly archiveConfig: ArchiveConfig;
     public readonly archives: Map<string, Js5Archive>;
+    public readonly config: ArchiveConfig;
     public readonly packedStorePath: string;
     public readonly configPath: string;
+    public readonly gameVersion: number | undefined;
 
-    public packedMainIndexChannel: ByteBuffer;
-    public packedIndexChannels: Map<string, ByteBuffer>;
-    public packedDataChannel: ByteBuffer;
+    private readonly _packedIndexChannels: Map<string, ByteBuffer>;
+    private _packedMainIndexChannel: ByteBuffer;
+    private _packedDataChannel: ByteBuffer;
 
-    public constructor(packedStorePath: string, configPath: string) {
+    public constructor(packedStorePath: string, configPath: string, gameVersion?: number | undefined) {
         this.packedStorePath = packedStorePath;
         this.configPath = configPath;
-        this.archiveConfig = new ArchiveConfig(configPath);
+        this.config = new ArchiveConfig(configPath);
         this.archives = new Map<string, Js5Archive>();
-        this.packedIndexChannels = new Map<string, ByteBuffer>();
+        this._packedIndexChannels = new Map<string, ByteBuffer>();
+        this.gameVersion = gameVersion;
         this.readPackedStore();
+    }
+
+    public getArchive(archiveName: string): Js5Archive {
+        return this.archives.get(this.config.getArchiveIndex(archiveName));
+    }
+
+    public decode(): void {
+        for(const [ , archive ] of this.archives) {
+            archive.decode();
+        }
     }
 
     public readPackedStore(): void {
@@ -52,8 +64,8 @@ export class Js5Store {
         const dataFilePath = path.join(this.packedStorePath, dataFile);
         const mainIndexFilePath = path.join(this.packedStorePath, mainIndexFile);
 
-        this.packedDataChannel = new ByteBuffer(fs.readFileSync(dataFilePath));
-        this.packedMainIndexChannel = new ByteBuffer(fs.readFileSync(mainIndexFilePath));
+        this._packedDataChannel = new ByteBuffer(fs.readFileSync(dataFilePath));
+        this._packedMainIndexChannel = new ByteBuffer(fs.readFileSync(mainIndexFilePath));
 
         const mainArchive = new Js5Archive(this, 255);
         this.archives.set('255', mainArchive);
@@ -75,13 +87,20 @@ export class Js5Store {
             }
 
             const fileData = new ByteBuffer(fs.readFileSync(path.join(this.packedStorePath, fileName)));
-            this.packedIndexChannels.set(index, fileData);
+            this._packedIndexChannels.set(index, fileData);
             this.archives.set(index, new Js5Archive(this, numericIndex, mainArchive));
-        }
-
-        for(const [ , archive ] of this.archives) {
-            archive.decode();
         }
     }
 
+    public get packedMainIndexChannel(): ByteBuffer {
+        return this._packedMainIndexChannel;
+    }
+
+    public get packedIndexChannels(): Map<string, ByteBuffer> {
+        return this._packedIndexChannels;
+    }
+
+    public get packedDataChannel(): ByteBuffer {
+        return this._packedDataChannel;
+    }
 }

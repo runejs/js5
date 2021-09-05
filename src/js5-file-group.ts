@@ -22,7 +22,7 @@ export class Js5FileGroup extends Js5File {
         }
 
         if(!this._data?.length) {
-            const js5Store = this.archive.js5Store;
+            const js5Store = this.archive.store;
             this.extractPackedFile(js5Store.packedIndexChannels.get(this.archive.index), js5Store.packedDataChannel);
         }
 
@@ -31,7 +31,9 @@ export class Js5FileGroup extends Js5File {
         }
 
         if(this.files.size === 1) {
-            Array.from(this.files.values())[0].setData(this._data, this.compressed);
+            const onlyChild: Js5File = Array.from(this.files.values())[0];
+            onlyChild.nameHash = this.nameHash;
+            onlyChild.setData(this._data, this.compressed);
         } else {
             const dataLength = this._data?.length ?? 0;
 

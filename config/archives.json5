@@ -70,6 +70,7 @@
     maps: {
         index: 5,
         compression: 'gzip',
+        encryption: 'xtea',
         content: {
             type: 'files',
             fileExtension: '.dat',

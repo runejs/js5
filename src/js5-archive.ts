@@ -3,11 +3,11 @@ import { Js5FileGroup } from './js5-file-group';
 import { Js5File } from './js5-file';
 import { logger } from '@runejs/core';
 import { ArchiveInfo } from './config/archive-config';
+import { plurality } from './util/string';
 
 
 export class Js5Archive extends Js5File {
 
-    public readonly js5Store: Js5Store;
     public readonly groups: Map<string, Js5FileGroup>;
     public readonly config: ArchiveInfo;
 
@@ -15,14 +15,13 @@ export class Js5Archive extends Js5File {
     private _filesNamed: boolean;
 
     public constructor(js5Store: Js5Store, index: string | number, archive?: Js5Archive) {
-        super(index, archive);
-        this.js5Store = js5Store;
+        super(index, js5Store, archive);
         this.groups = new Map<string, Js5FileGroup>();
-        this.config = js5Store.archiveConfig.getArchiveInfo(this.index);
+        this.config = js5Store.config.getArchiveInfo(this.index);
     }
 
     public decode(): void {
-        this._nameHash = this.js5Store.archiveConfig.hashFileName(this.config.name);
+        this._nameHash = this.store.config.hashFileName(this.config.name);
         this._name = this.config.name;
 
         if(this.index === '255') {
@@ -31,7 +30,7 @@ export class Js5Archive extends Js5File {
 
         logger.info(`Decoding archive ${this.name}...`);
 
-        this.extractPackedFile(this.js5Store.packedMainIndexChannel, this.js5Store.packedDataChannel);
+        this.extractPackedFile(this.store.packedMainIndexChannel, this.store.packedDataChannel);
 
         const archiveData = this.decompress();
 
@@ -44,12 +43,9 @@ export class Js5Archive extends Js5File {
         this.filesNamed = (archiveData.get('byte', 'unsigned') & 0x01) !== 0;
 
         const fileCount = archiveData.get('short', 'unsigned');
-
         const groupIndices: number[] = new Array(fileCount);
-
-        logger.info(`${fileCount} file(s) found.`);
-
         let accumulator = 0;
+
         for(let i = 0; i < fileCount; i++) {
             const delta = archiveData.get('short', 'unsigned');
             groupIndices[i] = accumulator += delta;
@@ -107,10 +103,35 @@ export class Js5Archive extends Js5File {
             }
         }
 
+        let successes = 0;
+        let failures = 0;
+
         if(this.groups.size) {
             for(const [ , group ] of this.groups) {
-                group?.decode();
+                try {
+                    group?.decode();
+
+                    if(group?.data?.length && !group.compressed) {
+                        successes++;
+                    } else {
+                        failures++;
+                    }
+                } catch(error) {
+                    logger.error(error);
+                    failures++;
+                }
             }
+        }
+
+        if(successes) {
+            logger.info(`${fileCount} ${plurality('file', fileCount)} were found, ` +
+                `${successes} decompressed successfully.`);
+        } else {
+            logger.info(`${fileCount} ${plurality('file', fileCount)} were found.`);
+        }
+
+        if(failures) {
+            logger.error(`${failures} ${plurality('file', failures)} failed to decompress.`);
         }
     }
 
