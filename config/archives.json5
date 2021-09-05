@@ -11,7 +11,6 @@
         compression: 'bzip',
         content: {
             type: 'files',
-            fileExtension: '.dat'
         },
     },
     bases: {
@@ -19,7 +18,6 @@
         compression: 'gzip',
         content: {
             type: 'files',
-            fileExtension: '.dat',
         },
     },
     config: {
@@ -27,7 +25,6 @@
         compression: 'bzip',
         content: {
             type: 'groups',
-            fileExtension: '.dat',
             defaultFileNames: {
                 underlays: 1,
                 // 2?
@@ -56,7 +53,6 @@
         compression: 'bzip',
         content: {
             type: 'groups',
-            fileExtension: '.dat'
         },
     },
     synth_sounds: {
@@ -73,7 +69,6 @@
         encryption: 'xtea',
         content: {
             type: 'files',
-            fileExtension: '.dat',
             saveFileNames: true,
         },
     },
@@ -91,7 +86,6 @@
         compression: 'gzip',
         content: {
             type: 'files',
-            fileExtension: '.dat',
         },
     },
     sprites: {
@@ -99,7 +93,6 @@
         compression: 'gzip',
         content: {
             type: 'files',
-            fileExtension: '.dat',
             saveFileNames: true
         },
     },
@@ -108,7 +101,6 @@
         compression: 'gzip',
         content: {
             type: 'groups',
-            fileExtension: '.dat',
         },
     },
     binary: {

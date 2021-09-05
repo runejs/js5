@@ -9,10 +9,7 @@
         "start": "ts-node src/dev.ts",
         "lint": "eslint --ext .ts src",
         "lint:fix": "eslint --ext .ts src --fix",
-        "copy-documents": "cp package.json lib && cp README.md lib && cp .npmignore lib && cp LICENSE lib",
-        "copy-documents:windows": "copy package.json lib && copy README.md lib && copy .npmignore lib && copy LICENSE lib",
-        "package": "rimraf lib && npm run build && npm run copy-documents && cd lib && npm publish --dry-run",
-        "package:windows": "rimraf lib && npm run build && npm run copy-documents:windows && cd lib && npm publish --dry-run"
+        "package": "rimraf lib && npm i && npm run build && npm publish --dry-run"
     },
     "repository": {
         "type": "git",
