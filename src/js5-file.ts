@@ -34,7 +34,7 @@ export class Js5File {
         }
         this.index = typeof index === 'number' ? String(index) : index;
         this.setData(null, true);
-        this._name = '';
+        this._name = this.index;
     }
 
     public compress(): ByteBuffer {
