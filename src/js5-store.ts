@@ -10,6 +10,7 @@ export interface Js5StoreOptions {
     storePath: string;
     configPath: string;
     gameVersion?: number | undefined;
+    xteaDisabled?: boolean;
 }
 
 
@@ -19,7 +20,7 @@ export class Js5Store {
     public readonly config: StoreConfig;
     public readonly storePath: string;
     public readonly configPath: string;
-    public readonly gameVersion: number | undefined;
+    public xteaDisabled: boolean;
 
     private readonly _packedIndexChannels: Map<string, ByteBuffer>;
     private _packedMainIndexChannel: ByteBuffer;
@@ -35,10 +36,10 @@ export class Js5Store {
 
         this.storePath = options.storePath;
         this.configPath = options.configPath;
+        this.xteaDisabled = options.xteaDisabled ?? false;
         this.archives = new Map<string, Js5Archive>();
         this._packedIndexChannels = new Map<string, ByteBuffer>();
-        this.gameVersion = options.gameVersion;
-        StoreConfig.register(options.configPath);
+        StoreConfig.register(options.configPath, options.gameVersion);
         this.readPackedStore();
     }
 

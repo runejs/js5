@@ -8,12 +8,12 @@ import { Xtea, XteaKeys } from '@runejs/core/encryption';
 export type ArchiveContentType = 'groups' | 'files';
 
 
-export type FileEncryptionType = 'none' | 'xtea';
+export type EncryptionMethod = 'none' | 'xtea';
 
 
 export interface ArchiveContentDetails {
     type?: ArchiveContentType;
-    encryption?: FileEncryptionType;
+    encryption?: EncryptionMethod;
     fileExtension?: string;
     saveFileNames?: boolean;
     defaultFileNames?: { [key: string]: number };
@@ -31,20 +31,20 @@ export interface ArchiveDetails {
 
 export class StoreConfig {
 
+    public static gameVersion: number | undefined;
+
     private static _configPath: string;
 
     private static readonly archives: Map<string, ArchiveDetails> = new Map<string, ArchiveDetails>();
     private static readonly fileNames: Map<number, string> = new Map<number, string>();
     private static readonly xteaKeys: Map<string, XteaKeys[]> = new Map<string, XteaKeys[]>();
 
-    public static register(configPath: string): void {
+    public static register(configPath: string, gameVersion?: number | undefined): void {
         StoreConfig._configPath = configPath;
+        StoreConfig.gameVersion = gameVersion;
     }
 
-    public static getXteaKey(fileName: string): XteaKeys[] | null;
-    public static getXteaKey(fileName: string, gameVersion: number): XteaKeys | null;
-    public static getXteaKey(fileName: string, gameVersion?: number | undefined): XteaKeys | XteaKeys[] | null;
-    public static getXteaKey(fileName: string, gameVersion?: number | undefined): XteaKeys | XteaKeys[] | null {
+    public static getXteaKey(fileName: string): XteaKeys | XteaKeys[] | null {
         if(!StoreConfig.xteaKeys.size) {
             StoreConfig.loadXteaKeys();
         }
@@ -59,8 +59,8 @@ export class StoreConfig {
             return null;
         }
 
-        if(gameVersion !== undefined) {
-            return keySets.find(keySet => keySet.gameVersion === gameVersion) ?? null;
+        if(StoreConfig.gameVersion !== undefined) {
+            return keySets.find(keySet => keySet.gameVersion === StoreConfig.gameVersion) ?? null;
         }
 
         return keySets;
