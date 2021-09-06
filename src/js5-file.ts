@@ -1,40 +1,39 @@
 import { ByteBuffer } from '@runejs/core/buffer';
-import { Compression, Bzip2, Gzip } from '@runejs/core/compression';
 import { Xtea, XteaKeys } from '@runejs/core/encryption';
-import { Js5Archive } from './js5-archive';
+import { Bzip2, Compression, Gzip } from '@runejs/core/compression';
 import { Js5Store } from './js5-store';
+import { Js5Archive } from './js5-archive';
+import { IndexedFile } from './indexed-file';
+import { StoreConfig } from './config';
 
 
-export class Js5File {
+export class Js5File extends IndexedFile {
 
     public readonly store: Js5Store;
     public readonly archive: Js5Archive;
-    public readonly index: string;
 
-    protected _compression: Compression;
-    protected _crc32: number;
-    protected _name: string;
-    protected _version: number | undefined;
-    protected _nameHash: number | undefined;
-    protected _data: ByteBuffer | undefined;
-    protected _compressed: boolean;
-    protected _size: number;
     protected _sector: number;
 
     public constructor(index: string | number, store: Js5Store);
     public constructor(index: string | number, archive: Js5Archive);
     public constructor(index: string | number, store: Js5Store, archive: Js5Archive);
     public constructor(index: string | number, arg1: Js5Store | Js5Archive, arg2?: Js5Archive) {
+        super(index);
+
+        let store: Js5Store;
+        let archive: Js5Archive;
         if(arg1 instanceof Js5Archive) {
-            this.archive = arg1;
-            this.store = arg1.store;
+            archive = arg1;
+            store = arg1.store;
         } else {
-            this.store = arg1;
-            this.archive = arg2;
+            store = arg1;
+            archive = arg2;
         }
-        this.index = typeof index === 'number' ? String(index) : index;
-        this.setData(null, true);
+
+        this.store = store;
+        this.archive = archive;
         this._name = this.index;
+        this.setData(null, true);
     }
 
     public compress(): ByteBuffer {
@@ -109,10 +108,10 @@ export class Js5File {
         const readerIndex = compressedData.readerIndex;
         let decodedDataSets: ByteBuffer[] = [];
 
-        if(this.archive?.config?.content?.encryption === 'xtea') {
+        if(this.archive?.details?.content?.encryption === 'xtea') {
             let keySets: XteaKeys[] = [];
             if(this.name) {
-                const loadedKeys = this.store.config.getXteaKey(this.name, this.store.gameVersion);
+                const loadedKeys = StoreConfig.getXteaKey(this.name, this.store.gameVersion);
                 if(loadedKeys && !Array.isArray(loadedKeys)) {
                     keySets = [ loadedKeys ];
                 }
@@ -273,73 +272,12 @@ export class Js5File {
         return this._data;
     }
 
-    public setData(data: ByteBuffer, compressed: boolean): void {
-        if(data?.length) {
-            data.readerIndex = 0;
-            data.writerIndex = 0;
-            this._data = data;
-        } else {
-            this._data = null;
-        }
-        this._compressed = compressed;
-        this._size = data?.length ?? 0;
+    public get compression(): Compression {
+        return this._compression ?? this.archive?.compression ?? Compression.uncompressed;
     }
 
-    public get numericIndex(): number {
-        return Number(this.index);
-    }
-    
-    public get compression(): Compression {
-        return this._compression ?? this.archive.compression;
-    }
-    
     public set compression(compression: Compression) {
         this._compression = compression;
-    }
-
-    public get crc32(): number {
-        return this._crc32;
-    }
-
-    public set crc32(value: number) {
-        this._crc32 = value;
-    }
-
-    public get version(): number | undefined {
-        return this._version;
-    }
-
-    public set version(value: number) {
-        this._version = value;
-    }
-
-    public get nameHash(): number | undefined {
-        return this._nameHash;
-    }
-
-    public set nameHash(nameHash: number) {
-        this._nameHash = nameHash;
-        this._name = this.archive?.store?.config.getFileName(nameHash);
-    }
-
-    public get name(): string {
-        return this._name;
-    }
-
-    public get data(): ByteBuffer {
-        return this._data;
-    }
-
-    public get compressed(): boolean {
-        return this._compressed;
-    }
-
-    public get size(): number {
-        return this._size;
-    }
-
-    public set size(value: number) {
-        this._size = value;
     }
 
     public get sector(): number {

@@ -29,32 +29,32 @@ export interface ArchiveDetails {
 }
 
 
-export class ArchiveConfig {
+export class StoreConfig {
 
     private static _configPath: string;
 
-    private static readonly configs: Map<string, ArchiveDetails> = new Map<string, ArchiveDetails>();
+    private static readonly archives: Map<string, ArchiveDetails> = new Map<string, ArchiveDetails>();
     private static readonly fileNames: Map<number, string> = new Map<number, string>();
     private static readonly xteaKeys: Map<string, XteaKeys[]> = new Map<string, XteaKeys[]>();
 
     public static register(configPath: string): void {
-        ArchiveConfig._configPath = configPath;
+        StoreConfig._configPath = configPath;
     }
 
     public static getXteaKey(fileName: string): XteaKeys[] | null;
     public static getXteaKey(fileName: string, gameVersion: number): XteaKeys | null;
     public static getXteaKey(fileName: string, gameVersion?: number | undefined): XteaKeys | XteaKeys[] | null;
     public static getXteaKey(fileName: string, gameVersion?: number | undefined): XteaKeys | XteaKeys[] | null {
-        if(!ArchiveConfig.xteaKeys.size) {
-            ArchiveConfig.loadXteaKeys();
+        if(!StoreConfig.xteaKeys.size) {
+            StoreConfig.loadXteaKeys();
         }
 
-        if(!ArchiveConfig.xteaKeys.size) {
+        if(!StoreConfig.xteaKeys.size) {
             logger.error(`XTEA keys could not be loaded.`);
             return null;
         }
 
-        const keySets = ArchiveConfig.xteaKeys.get(fileName);
+        const keySets = StoreConfig.xteaKeys.get(fileName);
         if(!keySets) {
             return null;
         }
@@ -67,23 +67,23 @@ export class ArchiveConfig {
     }
 
     public static getArchiveDetails(archiveIndex: string): ArchiveDetails {
-        if(!ArchiveConfig.configs.size) {
-            ArchiveConfig.loadConfig();
+        if(!StoreConfig.archives.size) {
+            StoreConfig.loadConfig();
         }
 
-        return ArchiveConfig.configs.get(archiveIndex);
+        return StoreConfig.archives.get(archiveIndex);
     }
 
     public static getArchiveGroupNames(archiveIndex: string): { [groupName: string]: number } {
-        return ArchiveConfig.getArchiveDetails(archiveIndex)?.content?.defaultFileNames ?? {};
+        return StoreConfig.getArchiveDetails(archiveIndex)?.content?.defaultFileNames ?? {};
     }
 
     public static getArchiveName(archiveIndex: string): string | undefined {
-        return ArchiveConfig.getArchiveDetails(archiveIndex)?.name ?? undefined;
+        return StoreConfig.getArchiveDetails(archiveIndex)?.name ?? undefined;
     }
 
     public static getArchiveIndex(archiveName: string): string | undefined {
-        for(const [ archiveIndex, archive ] of ArchiveConfig.configs) {
+        for(const [ archiveIndex, archive ] of StoreConfig.archives) {
             if(archive.name === archiveName) {
                 return archiveIndex;
             }
@@ -106,19 +106,19 @@ export class ArchiveConfig {
             nameHash = Number(nameHash);
         }
 
-        if(!ArchiveConfig.fileNames.size) {
-            ArchiveConfig.loadFileNames();
+        if(!StoreConfig.fileNames.size) {
+            StoreConfig.loadFileNames();
         }
 
-        return ArchiveConfig.fileNames.get(nameHash) ?? undefined;
+        return StoreConfig.fileNames.get(nameHash) ?? undefined;
     }
 
     public static loadXteaKeys(): void {
-        Xtea.loadKeys(path.join(ArchiveConfig.configPath, 'xtea'));
+        Xtea.loadKeys(path.join(StoreConfig.configPath, 'xtea'));
     }
 
     public static loadFileNames(): void {
-        const configPath = path.join(ArchiveConfig.configPath, 'name-hashes.json');
+        const configPath = path.join(StoreConfig.configPath, 'name-hashes.json');
         if(!fs.existsSync(configPath)) {
             logger.error(`Error loading file names: ${configPath} was not found.`);
             return;
@@ -126,14 +126,14 @@ export class ArchiveConfig {
 
         try {
             const nameTable = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as { [key: string]: string };
-            Object.keys(nameTable).forEach(nameHash => ArchiveConfig.fileNames.set(Number(nameHash), nameTable[nameHash]));
+            Object.keys(nameTable).forEach(nameHash => StoreConfig.fileNames.set(Number(nameHash), nameTable[nameHash]));
         } catch(error) {
             logger.error(`Error loading file names:`, error);
         }
     }
 
     public static loadConfig(): void {
-        const configPath = path.join(ArchiveConfig.configPath, 'archives.json5');
+        const configPath = path.join(StoreConfig.configPath, 'archives.json5');
         if(!fs.existsSync(configPath)) {
             logger.error(`Error loading archive config: ${configPath} was not found.`);
             return;
@@ -145,7 +145,7 @@ export class ArchiveConfig {
             for(const archiveName of archiveNames) {
                 const archive = archiveInfo[archiveName];
                 archive.name = archiveName;
-                ArchiveConfig.configs.set(String(archive.index), archive);
+                StoreConfig.archives.set(String(archive.index), archive);
             }
         } catch(error) {
             logger.error(`Error loading archive config:`, error);
@@ -153,7 +153,7 @@ export class ArchiveConfig {
     }
 
     public static get configPath(): string {
-        return ArchiveConfig._configPath;
+        return StoreConfig._configPath;
     }
 
 }

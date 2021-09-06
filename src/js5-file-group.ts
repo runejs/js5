@@ -1,7 +1,7 @@
-import { Js5File } from './js5-file';
-import { Js5Archive } from './js5-archive';
 import { logger } from '@runejs/core';
 import { ByteBuffer } from '@runejs/core/buffer';
+import { Js5File } from './js5-file';
+import { Js5Archive } from './js5-archive';
 
 
 export class Js5FileGroup extends Js5File {
