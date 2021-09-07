@@ -33,11 +33,11 @@ export class StoreConfig {
 
     public static gameVersion: number | undefined;
 
-    private static _configPath: string;
+    public static readonly archives: Map<string, ArchiveDetails> = new Map<string, ArchiveDetails>();
+    public static readonly fileNames: Map<number, string> = new Map<number, string>();
+    public static readonly xteaKeys: Map<string, XteaKeys[]> = new Map<string, XteaKeys[]>();
 
-    private static readonly archives: Map<string, ArchiveDetails> = new Map<string, ArchiveDetails>();
-    private static readonly fileNames: Map<number, string> = new Map<number, string>();
-    private static readonly xteaKeys: Map<string, XteaKeys[]> = new Map<string, XteaKeys[]>();
+    private static _configPath: string;
 
     public static register(configPath: string, gameVersion?: number | undefined): void {
         StoreConfig._configPath = configPath;
