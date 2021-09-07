@@ -3,6 +3,7 @@ import { Compression } from '@runejs/core/compression';
 import { Js5Store } from './js5-store';
 import { Js5Archive } from './js5-archive';
 import { StoreFileBase } from './store-file-base';
+import { logger } from '@runejs/core';
 
 
 export class Js5File extends StoreFileBase {
@@ -39,19 +40,25 @@ export class Js5File extends StoreFileBase {
         return super.decompress(encryption);
     }
 
-    public extractPackedFile(indexChannel: ByteBuffer, dataChannel: ByteBuffer): ByteBuffer {
+    public extractPackedFile(indexChannel: ByteBuffer, dataChannel: ByteBuffer): ByteBuffer | null {
         const indexDataLength = 6;
 
         let pointer = this.numericIndex * indexDataLength;
         if(pointer < 0 || pointer >= indexChannel.length) {
-            throw new Error('File Not Found');
+            if(this.archive) {
+                logger.error(`File ${this.index} was not found within the packed ${this.archive.name} archive index file.`);
+            } else {
+                logger.error(`File ${this.index} was not found within the provided index file.`);
+            }
+            return null;
         }
 
         const fileIndexData = new ByteBuffer(indexDataLength);
         indexChannel.copy(fileIndexData, 0, pointer, pointer + indexDataLength);
 
         if(fileIndexData.readable !== indexDataLength) {
-            throw new Error(`Not Enough Readable Index Data: Buffer contains ${fileIndexData.readable} but needed ${indexDataLength}`);
+            logger.error(`Error reading packed file ${this.index}, the end of the data stream was reached.`);
+            return null;
         }
 
         this.size = fileIndexData.get('int24', 'unsigned');
@@ -61,7 +68,7 @@ export class Js5File extends StoreFileBase {
         const sectorDataLength = 512;
         const fullSectorLength = 520;
 
-        let chunk = 0, remaining = this.size;
+        let sector = 0, remaining = this.size;
         pointer = this.sector * fullSectorLength;
 
         do {
@@ -69,13 +76,14 @@ export class Js5File extends StoreFileBase {
             dataChannel.copy(temp, 0, pointer, pointer + fullSectorLength);
 
             if(temp.readable !== fullSectorLength) {
-                throw new Error(`Not Enough Readable Sector Data: Buffer contains ${temp.readable} but needed ${fullSectorLength}`);
+                logger.error(`Error reading sector for packed file ${this.index}, the end of the data stream was reached.`);
+                return null;
             }
 
-            const sectorId = temp.get('short', 'unsigned');
-            const sectorChunk = temp.get('short', 'unsigned');
+            const sectorFileIndex = temp.get('short', 'unsigned');
+            const currentSector = temp.get('short', 'unsigned');
             const nextSector = temp.get('int24', 'unsigned');
-            const sectorIndex = temp.get('byte', 'unsigned');
+            const sectorArchiveIndex = temp.get('byte', 'unsigned');
             const sectorData = new ByteBuffer(sectorDataLength);
             temp.copy(sectorData, 0, temp.readerIndex, temp.readerIndex + sectorDataLength);
 
@@ -84,16 +92,20 @@ export class Js5File extends StoreFileBase {
                 data.writerIndex = (data.writerIndex + sectorDataLength);
                 remaining -= sectorDataLength;
 
-                if(sectorIndex !== this.archive.numericIndex) {
-                    throw new Error('File type mismatch.');
+                if(this.archive && sectorArchiveIndex !== this.archive.numericIndex) {
+                    logger.error(`Packed file ${this.index}'s archive index does not match. ` +
+                        `Expected ${this.archive.index} but received ${sectorFileIndex}`);
+                    return null;
                 }
 
-                if(sectorId !== this.numericIndex) {
-                    throw new Error('File id mismatch.');
+                if(sectorFileIndex !== this.numericIndex) {
+                    logger.error(`Packed file ${this.index} does not match read index ${sectorFileIndex}.`);
+                    return null;
                 }
 
-                if(sectorChunk !== chunk++) {
-                    throw new Error('Chunk mismatch.');
+                if(currentSector !== sector++) {
+                    logger.error(`Error loading packed file ${this.index}, unable to locate all file sectors.`);
+                    return null;
                 }
 
                 pointer = nextSector * fullSectorLength;

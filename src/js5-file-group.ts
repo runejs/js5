@@ -22,8 +22,8 @@ export class Js5FileGroup extends Js5File {
         }
 
         if(!this._data?.length) {
-            const js5Store = this.archive.store;
-            this.extractPackedFile(js5Store.packedIndexChannels.get(this.archive.index), js5Store.packedDataChannel);
+            this.extractPackedFile(this.archive.store.packedIndexChannels.get(this.archive.index),
+                this.archive.store.packedDataChannel);
         }
 
         if(this.compressed) {

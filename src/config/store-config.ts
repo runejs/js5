@@ -42,6 +42,7 @@ export class StoreConfig {
     public static register(configPath: string, gameVersion?: number | undefined): void {
         StoreConfig._configPath = configPath;
         StoreConfig.gameVersion = gameVersion;
+        StoreConfig.loadArchiveConfig();
     }
 
     public static getXteaKey(fileName: string): XteaKeys | XteaKeys[] | null {
@@ -68,7 +69,7 @@ export class StoreConfig {
 
     public static getArchiveDetails(archiveIndex: string): ArchiveDetails {
         if(!StoreConfig.archives.size) {
-            StoreConfig.loadConfig();
+            StoreConfig.loadArchiveConfig();
         }
 
         return StoreConfig.archives.get(archiveIndex);
@@ -132,7 +133,7 @@ export class StoreConfig {
         }
     }
 
-    public static loadConfig(): void {
+    public static loadArchiveConfig(): void {
         const configPath = path.join(StoreConfig.configPath, 'archives.json5');
         if(!fs.existsSync(configPath)) {
             logger.error(`Error loading archive config: ${configPath} was not found.`);
