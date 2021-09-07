@@ -1,7 +1,9 @@
 import { ByteBuffer } from '@runejs/core/buffer';
 import { Xtea, XteaKeys } from '@runejs/core/encryption';
 import { Bzip2, Compression, Gzip } from '@runejs/core/compression';
+import { buf as crc32 } from 'crc-32';
 import { EncryptionMethod, StoreConfig } from './config';
+import { createHash } from 'crypto';
 
 
 export abstract class StoreFileBase {
@@ -10,6 +12,7 @@ export abstract class StoreFileBase {
 
     protected _compression: Compression;
     protected _crc32: number;
+    protected _sha256: string;
     protected _name: string;
     protected _version: number | undefined;
     protected _nameHash: number | undefined;
@@ -19,9 +22,11 @@ export abstract class StoreFileBase {
 
     protected constructor(index: string | number) {
         this.index = typeof index === 'number' ? String(index) : index;
+        this._version = 0;
+        this._size = 0;
     }
 
-    public compress(): ByteBuffer {
+    public compress(versioned: boolean = true): ByteBuffer {
         if(this.compressed) {
             return this._data;
         }
@@ -31,7 +36,7 @@ export abstract class StoreFileBase {
 
         if(this.compression === Compression.uncompressed) {
             // uncompressed files
-            data = new ByteBuffer(decompressedData.length + (!this.version ? 5 : 7));
+            data = new ByteBuffer(decompressedData.length + (versioned ? 7 : 5));
 
             // indicate that no file compression is applied
             data.put(0);
@@ -49,7 +54,7 @@ export abstract class StoreFileBase {
 
             const compressedLength: number = compressedData.length;
 
-            data = new ByteBuffer(compressedData.length + (!this.version ? 9 : 11));
+            data = new ByteBuffer(compressedData.length + (versioned ? 11 : 9));
 
             // indicate which type of file compression was used (1 or 2)
             data.put(this.compression);
@@ -65,8 +70,8 @@ export abstract class StoreFileBase {
         }
 
         if(data?.length) {
-            if(this.version) {
-                data.put(this.version, 'short');
+            if(versioned) {
+                data.put(this.version ?? 0, 'short');
             }
 
             this.setData(data.flipWriter(), true);
@@ -198,6 +203,16 @@ export abstract class StoreFileBase {
         this._size = data?.length ?? 0;
     }
 
+    public generateCrc32(): number {
+        this._crc32 = crc32(this._data);
+        return this._crc32;
+    }
+
+    public generateSha256(): string {
+        this._sha256 = createHash('sha256').update(this._data).digest('hex');
+        return this._sha256;
+    }
+
     public get numericIndex(): number {
         return Number(this.index);
     }
@@ -216,6 +231,14 @@ export abstract class StoreFileBase {
 
     public set crc32(value: number) {
         this._crc32 = value;
+    }
+
+    public get sha256(): string {
+        return this._sha256;
+    }
+
+    public set sha256(value: string) {
+        this._sha256 = value;
     }
 
     public get version(): number | undefined {

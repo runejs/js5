@@ -1,6 +1,6 @@
 {
     "name": "@runejs/js5",
-    "version": "1.0.0-beta.4",
+    "version": "1.0.0-beta.5",
     "description": "Tools for working with the JS5 file storage system used by the Java game client.",
     "main": "lib/index.js",
     "types": "lib/index.d.ts",
@@ -32,6 +32,7 @@
     "dependencies": {
         "@runejs/core": "^1.6.0",
         "compressjs": "^1.0.3",
+        "crc-32": "^1.2.0",
         "json5": "^2.2.0",
         "tslib": ">=2.1.0"
     },

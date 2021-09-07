@@ -11,7 +11,7 @@ export class Js5File extends StoreFileBase {
     public readonly store: Js5Store;
     public readonly archive: Js5Archive;
 
-    protected _sector: number;
+    protected _stripeCount: number;
 
     public constructor(index: string | number, store: Js5Store);
     public constructor(index: string | number, archive: Js5Archive);
@@ -61,56 +61,56 @@ export class Js5File extends StoreFileBase {
             return null;
         }
 
-        this.size = fileIndexData.get('int24', 'unsigned');
-        this.sector = fileIndexData.get('int24', 'unsigned');
+        this._size = fileIndexData.get('int24', 'unsigned');
+        this._stripeCount = fileIndexData.get('int24', 'unsigned');
 
         const data = new ByteBuffer(this.size);
-        const sectorDataLength = 512;
-        const fullSectorLength = 520;
+        const stripeDataLength = 512;
+        const stripeLength = 520;
 
-        let sector = 0, remaining = this.size;
-        pointer = this.sector * fullSectorLength;
+        let stripe = 0, remaining = this.size;
+        pointer = this._stripeCount * stripeLength;
 
         do {
-            const temp = new ByteBuffer(fullSectorLength);
-            dataChannel.copy(temp, 0, pointer, pointer + fullSectorLength);
+            const temp = new ByteBuffer(stripeLength);
+            dataChannel.copy(temp, 0, pointer, pointer + stripeLength);
 
-            if(temp.readable !== fullSectorLength) {
+            if(temp.readable !== stripeLength) {
                 logger.error(`Error reading sector for packed file ${this.index}, the end of the data stream was reached.`);
                 return null;
             }
 
-            const sectorFileIndex = temp.get('short', 'unsigned');
-            const currentSector = temp.get('short', 'unsigned');
-            const nextSector = temp.get('int24', 'unsigned');
-            const sectorArchiveIndex = temp.get('byte', 'unsigned');
-            const sectorData = new ByteBuffer(sectorDataLength);
-            temp.copy(sectorData, 0, temp.readerIndex, temp.readerIndex + sectorDataLength);
+            const stripeFileIndex = temp.get('short', 'unsigned');
+            const currentStripe = temp.get('short', 'unsigned');
+            const nextStripe = temp.get('int24', 'unsigned');
+            const stripeArchiveIndex = temp.get('byte', 'unsigned');
+            const stripeData = new ByteBuffer(stripeDataLength);
+            temp.copy(stripeData, 0, temp.readerIndex, temp.readerIndex + stripeDataLength);
 
-            if(remaining > sectorDataLength) {
-                sectorData.copy(data, data.writerIndex, 0, sectorDataLength);
-                data.writerIndex = (data.writerIndex + sectorDataLength);
-                remaining -= sectorDataLength;
+            if(remaining > stripeDataLength) {
+                stripeData.copy(data, data.writerIndex, 0, stripeDataLength);
+                data.writerIndex = (data.writerIndex + stripeDataLength);
+                remaining -= stripeDataLength;
 
-                if(this.archive && sectorArchiveIndex !== this.archive.numericIndex) {
+                if(this.archive && stripeArchiveIndex !== this.archive.numericIndex) {
                     logger.error(`Packed file ${this.index}'s archive index does not match. ` +
-                        `Expected ${this.archive.index} but received ${sectorFileIndex}`);
+                        `Expected ${this.archive.index} but received ${stripeFileIndex}`);
                     return null;
                 }
 
-                if(sectorFileIndex !== this.numericIndex) {
-                    logger.error(`Packed file ${this.index} does not match read index ${sectorFileIndex}.`);
+                if(stripeFileIndex !== this.numericIndex) {
+                    logger.error(`Packed file ${this.index} does not match read index ${stripeFileIndex}.`);
                     return null;
                 }
 
-                if(currentSector !== sector++) {
-                    logger.error(`Error loading packed file ${this.index}, unable to locate all file sectors.`);
+                if(currentStripe !== stripe++) {
+                    logger.error(`Error loading packed file ${this.index}, file corrupt.`);
                     return null;
                 }
 
-                pointer = nextSector * fullSectorLength;
+                pointer = nextStripe * stripeLength;
             } else {
-                sectorData.copy(data, data.writerIndex, 0, remaining);
+                stripeData.copy(data, data.writerIndex, 0, remaining);
                 data.writerIndex = (data.writerIndex + remaining);
                 remaining = 0;
             }
@@ -128,11 +128,11 @@ export class Js5File extends StoreFileBase {
         this._compression = compression;
     }
 
-    public get sector(): number {
-        return this._sector;
+    public get stripeCount(): number {
+        return this._stripeCount;
     }
 
-    public set sector(value: number) {
-        this._sector = value;
+    public set stripeCount(value: number) {
+        this._stripeCount = value;
     }
 }

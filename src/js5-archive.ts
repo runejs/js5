@@ -32,7 +32,11 @@ export class Js5Archive extends Js5File {
 
         this.extractPackedFile(this.store.packedMainIndexChannel, this.store.packedDataChannel);
 
+        this.generateCrc32();
+
         const archiveData = this.decompress();
+
+        this.generateSha256();
 
         if(!archiveData?.length) {
             logger.error(`Error decompressing file data.`);
