@@ -203,13 +203,13 @@ export abstract class StoreFileBase {
         this._size = data?.length ?? 0;
     }
 
-    public generateCrc32(): number {
-        this._crc32 = crc32(this._data);
+    public generateCrc32(): number | undefined {
+        this._crc32 = !this.empty ? crc32(this._data) : undefined;
         return this._crc32;
     }
 
-    public generateSha256(): string {
-        this._sha256 = createHash('sha256').update(this._data).digest('hex');
+    public generateSha256(): string | undefined {
+        this._sha256 = !this.empty ? createHash('sha256').update(this._data).digest('hex') : undefined;
         return this._sha256;
     }
 
@@ -281,6 +281,10 @@ export abstract class StoreFileBase {
 
     public set size(value: number) {
         this._size = value;
+    }
+
+    public get empty(): boolean {
+        return !this._data?.length;
     }
 
 }

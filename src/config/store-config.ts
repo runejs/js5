@@ -5,14 +5,10 @@ import { logger } from '@runejs/core';
 import { Xtea, XteaKeys } from '@runejs/core/encryption';
 
 
-export type ArchiveContentType = 'groups' | 'files';
-
-
 export type EncryptionMethod = 'none' | 'xtea';
 
 
 export interface ArchiveContentDetails {
-    type?: ArchiveContentType;
     encryption?: EncryptionMethod;
     fileExtension?: string;
     saveFileNames?: boolean;

@@ -47,9 +47,9 @@ export class Js5Store {
         return this.archives.get(StoreConfig.getArchiveIndex(archiveName));
     }
 
-    public decode(): void {
+    public decode(decodeGroups: boolean = true): void {
         for(const [ , archive ] of this.archives) {
-            archive.decode();
+            archive.decode(decodeGroups);
         }
     }
 

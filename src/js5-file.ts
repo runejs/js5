@@ -32,7 +32,6 @@ export class Js5File extends StoreFileBase {
         this.store = store;
         this.archive = archive;
         this._name = this.index;
-        this.setData(null, true);
     }
 
     public decompress(): ByteBuffer | null {

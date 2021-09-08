@@ -2,6 +2,7 @@ import { logger } from '@runejs/core';
 import { ByteBuffer } from '@runejs/core/buffer';
 import { Js5File } from './js5-file';
 import { Js5Archive } from './js5-archive';
+import { on } from 'cluster';
 
 
 export class Js5FileGroup extends Js5File {
@@ -30,10 +31,14 @@ export class Js5FileGroup extends Js5File {
             this.decompress();
         }
 
+        this.generateSha256();
+
         if(this.files.size === 1) {
             const onlyChild: Js5File = Array.from(this.files.values())[0];
             onlyChild.nameHash = this.nameHash;
             onlyChild.setData(this._data, this.compressed);
+            onlyChild.sha256 = this.sha256;
+            onlyChild.crc32 = this.crc32;
         } else {
             const dataLength = this._data?.length ?? 0;
 
@@ -88,6 +93,8 @@ export class Js5FileGroup extends Js5File {
 
                     if(file?.data) {
                         this._data.copy(file.data, 0, this._data.readerIndex, sourceEnd);
+                        file.generateSha256();
+                        file.generateCrc32();
                     }
 
                     this._data.readerIndex = sourceEnd;

@@ -20,7 +20,7 @@ export class Js5Archive extends Js5File {
         this.details = StoreConfig.getArchiveDetails(this.index);
     }
 
-    public decode(): void {
+    public decode(decodeGroups: boolean = true): void {
         this._nameHash = StoreConfig.hashFileName(this.details.name);
         this._name = this.details.name;
 
@@ -107,35 +107,39 @@ export class Js5Archive extends Js5File {
             }
         }
 
-        let successes = 0;
-        let failures = 0;
+        if(decodeGroups) {
+            let successes = 0;
+            let failures = 0;
 
-        if(this.groups.size) {
-            for(const [ , group ] of this.groups) {
-                try {
-                    group?.decode();
+            if(this.groups.size) {
+                for(const [ , group ] of this.groups) {
+                    try {
+                        group?.decode();
 
-                    if(group?.data?.length && !group.compressed) {
-                        successes++;
-                    } else {
+                        if(group?.data?.length && !group.compressed) {
+                            successes++;
+                        } else {
+                            failures++;
+                        }
+                    } catch(error) {
+                        logger.error(error);
                         failures++;
                     }
-                } catch(error) {
-                    logger.error(error);
-                    failures++;
                 }
             }
-        }
 
-        if(successes) {
-            logger.info(`${fileCount} ${plurality('file', fileCount)} were found, ` +
-                `${successes} decompressed successfully.`);
+            if(successes) {
+                logger.info(`${fileCount} ${plurality('file', fileCount)} were found, ` +
+                    `${successes} decompressed successfully.`);
+            } else {
+                logger.info(`${fileCount} ${plurality('file', fileCount)} were found.`);
+            }
+
+            if(failures) {
+                logger.error(`${failures} ${plurality('file', failures)} failed to decompress.`);
+            }
         } else {
             logger.info(`${fileCount} ${plurality('file', fileCount)} were found.`);
-        }
-
-        if(failures) {
-            logger.error(`${failures} ${plurality('file', failures)} failed to decompress.`);
         }
     }
 
