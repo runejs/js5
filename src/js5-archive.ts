@@ -3,7 +3,6 @@ import { Js5Store } from './js5-store';
 import { Js5FileGroup } from './js5-file-group';
 import { Js5File } from './js5-file';
 import { StoreConfig, ArchiveDetails } from './config';
-import { plurality } from './util';
 
 
 export class Js5Archive extends Js5File {
@@ -129,17 +128,17 @@ export class Js5Archive extends Js5File {
             }
 
             if(successes) {
-                logger.info(`${fileCount} ${plurality('file', fileCount)} were found, ` +
+                logger.info(`${fileCount} file(s) were found, ` +
                     `${successes} decompressed successfully.`);
             } else {
-                logger.info(`${fileCount} ${plurality('file', fileCount)} were found.`);
+                logger.info(`${fileCount} file(s) were found.`);
             }
 
             if(failures) {
-                logger.error(`${failures} ${plurality('file', failures)} failed to decompress.`);
+                logger.error(`${failures} file(s) failed to decompress.`);
             }
         } else {
-            logger.info(`${fileCount} ${plurality('file', fileCount)} were found.`);
+            logger.info(`${fileCount} file(s) were found.`);
         }
     }
 

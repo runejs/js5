@@ -103,8 +103,6 @@ export class Js5FileGroup extends Js5File {
 
                     file.data.putBytes(stripeData);
 
-                    // this._data.copy(file.data, 0, this._data.readerIndex, sourceEnd);
-
                     file.generateSha256();
                     file.generateCrc32();
 
