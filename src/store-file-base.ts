@@ -10,15 +10,17 @@ export abstract class StoreFileBase {
 
     public readonly index: string;
 
+    protected _data: ByteBuffer | undefined;
     protected _compression: Compression;
+    protected _compressed: boolean;
+    protected _name: string;
+    protected _nameHash: number | undefined;
+    protected _version: number | undefined;
+    protected _size: number;
+    protected _stripeCount: number;
+    protected _stripeSizes: number[];
     protected _crc32: number;
     protected _sha256: string;
-    protected _name: string;
-    protected _version: number | undefined;
-    protected _nameHash: number | undefined;
-    protected _data: ByteBuffer | undefined;
-    protected _compressed: boolean;
-    protected _size: number;
 
     protected constructor(index: string | number) {
         this.index = typeof index === 'number' ? String(index) : index;
@@ -255,7 +257,9 @@ export abstract class StoreFileBase {
 
     public set nameHash(nameHash: number) {
         this._nameHash = nameHash;
-        this._name = StoreConfig.getFileName(nameHash);
+        if(nameHash) {
+            this._name = StoreConfig.getFileName(nameHash);
+        }
     }
 
     public get name(): string {
@@ -264,7 +268,9 @@ export abstract class StoreFileBase {
 
     public set name(name: string) {
         this._name = name;
-        this._nameHash = StoreConfig.hashFileName(name);
+        if(name) {
+            this._nameHash = StoreConfig.hashFileName(name);
+        }
     }
 
     public get data(): ByteBuffer {
@@ -287,4 +293,19 @@ export abstract class StoreFileBase {
         return !this._data?.length;
     }
 
+    public get stripeCount(): number {
+        return this._stripeCount;
+    }
+
+    public set stripeCount(value: number) {
+        this._stripeCount = value;
+    }
+
+    public get stripeSizes(): number[] {
+        return this._stripeSizes;
+    }
+
+    public set stripeSizes(value: number[]) {
+        this._stripeSizes = value;
+    }
 }

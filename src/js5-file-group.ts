@@ -2,14 +2,14 @@ import { logger } from '@runejs/core';
 import { ByteBuffer } from '@runejs/core/buffer';
 import { Js5File } from './js5-file';
 import { Js5Archive } from './js5-archive';
-import { on } from 'cluster';
 
 
 export class Js5FileGroup extends Js5File {
 
     public readonly files: Map<string, Js5File>;
 
-    private _encoded: boolean;
+    protected _fileSizes: Map<string, number>;
+    protected _encoded: boolean;
 
     public constructor(index: string | number, archive: Js5Archive) {
         super(index, archive);
@@ -47,55 +47,66 @@ export class Js5FileGroup extends Js5File {
                 return;
             }
 
-            this._data.readerIndex = (dataLength - 1);
+            this._data.readerIndex = (dataLength - 1); // EOF
 
-            const stripeCount = this._data.get('byte', 'unsigned');
+            this._stripeCount = this._data.get('byte', 'unsigned');
 
-            const stripeLengths: Map<string, number>[] = new Array(stripeCount);
-            const sizes: Map<string, number> = new Map<string, number>();
+            this._fileSizes = new Map<string, number>();
 
-            this._data.readerIndex = (dataLength - 1 - stripeCount * this.files.size * 4);
+            this._data.readerIndex = (dataLength - 1 - this._stripeCount * this.files.size * 4); // Stripe data footer
 
-            for(let stripe = 0; stripe < stripeCount; stripe++) {
+            for(let stripe = 0; stripe < this._stripeCount; stripe++) {
                 let currentLength = 0;
-                for(const [ fileIndex, ] of this.files) {
-                    const stripeLength = this._data.get('int');
-                    currentLength += stripeLength;
+                for(const [ fileIndex, file ] of this.files) {
+                    const delta = this._data.get('int');
+                    currentLength += delta;
 
-                    if(!stripeLengths[stripe]) {
-                        stripeLengths[stripe] = new Map<string, number>();
+                    if(!file.stripeSizes?.length) {
+                        file.stripeSizes = new Array(this._stripeCount);
                     }
 
-                    stripeLengths[stripe].set(fileIndex, currentLength);
-                    sizes.set(fileIndex, (sizes.get(fileIndex) ?? 0) + currentLength);
+                    let size = 0;
+                    if(!this._fileSizes.has(fileIndex)) {
+                        this._fileSizes.set(fileIndex, 0);
+                    } else {
+                        size = this._fileSizes.get(fileIndex);
+                    }
+
+                    file.stripeSizes[stripe] = currentLength;
+                    this._fileSizes.set(fileIndex, size + currentLength);
                 }
             }
 
             for(const [ fileIndex, file ] of this.files) {
-                file?.setData(new ByteBuffer(sizes.get(fileIndex) ?? 0), false);
+                const fileSize = this._fileSizes.get(fileIndex) || 0;
+                file.setData(new ByteBuffer(fileSize), false);
+                file.size = fileSize;
             }
 
             this._data.readerIndex = 0;
 
-            for(let stripe = 0; stripe < stripeCount; stripe++) {
-                for(const [ fileIndex, file ] of this.files) {
-                    const stripeLength = stripeLengths[stripe].get(fileIndex);
-                    if(!stripeLength) {
+            for(let stripe = 0; stripe < this._stripeCount; stripe++) {
+                for(const [ , file ] of this.files) {
+                    if(file.empty) {
                         continue;
                     }
 
-                    file?.data?.putBytes(this._data.getSlice(this._data.readerIndex, stripeLength));
+                    let stripeLength = file.stripeSizes[stripe];
 
                     let sourceEnd: number = this._data.readerIndex + stripeLength;
                     if(this._data.readerIndex + stripeLength >= this._data.length) {
                         sourceEnd = this._data.length;
+                        stripeLength = (this._data.readerIndex + stripeLength) - this._data.length;
                     }
 
-                    if(file?.data) {
-                        this._data.copy(file.data, 0, this._data.readerIndex, sourceEnd);
-                        file.generateSha256();
-                        file.generateCrc32();
-                    }
+                    const stripeData = this._data.getSlice(this._data.readerIndex, stripeLength);
+
+                    file.data.putBytes(stripeData);
+
+                    // this._data.copy(file.data, 0, this._data.readerIndex, sourceEnd);
+
+                    file.generateSha256();
+                    file.generateCrc32();
 
                     this._data.readerIndex = sourceEnd;
                 }
@@ -120,6 +131,14 @@ export class Js5FileGroup extends Js5File {
      */
     public getFile(fileIndex: number | string): Js5File | null {
         return this.files.get(typeof fileIndex === 'number' ? String(fileIndex) : fileIndex) ?? null;
+    }
+
+    public get fileSizes(): Map<string, number> {
+        return this._fileSizes;
+    }
+
+    public get stripeCount(): number {
+        return this._stripeCount;
     }
 
     public get encoded(): boolean {

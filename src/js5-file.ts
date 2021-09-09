@@ -11,8 +11,6 @@ export class Js5File extends StoreFileBase {
     public readonly store: Js5Store;
     public readonly archive: Js5Archive;
 
-    protected _stripeCount: number;
-
     public constructor(index: string | number, store: Js5Store);
     public constructor(index: string | number, archive: Js5Archive);
     public constructor(index: string | number, store: Js5Store, archive: Js5Archive);
@@ -61,14 +59,14 @@ export class Js5File extends StoreFileBase {
         }
 
         this._size = fileIndexData.get('int24', 'unsigned');
-        this._stripeCount = fileIndexData.get('int24', 'unsigned');
+        const stripeCount = fileIndexData.get('int24', 'unsigned');
 
         const data = new ByteBuffer(this.size);
         const stripeDataLength = 512;
         const stripeLength = 520;
 
         let stripe = 0, remaining = this.size;
-        pointer = this._stripeCount * stripeLength;
+        pointer = stripeCount * stripeLength;
 
         do {
             const temp = new ByteBuffer(stripeLength);
@@ -125,13 +123,5 @@ export class Js5File extends StoreFileBase {
 
     public set compression(compression: Compression) {
         this._compression = compression;
-    }
-
-    public get stripeCount(): number {
-        return this._stripeCount;
-    }
-
-    public set stripeCount(value: number) {
-        this._stripeCount = value;
     }
 }

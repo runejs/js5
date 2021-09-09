@@ -7,4 +7,4 @@ const store = new Js5Store({
     configPath: path.join('.', 'config')
 });
 
-store.decode();
+store.getArchive('anims').decode();

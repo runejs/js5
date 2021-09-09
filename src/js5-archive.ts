@@ -45,8 +45,8 @@ export class Js5Archive extends Js5File {
 
         this.format = archiveData.get('byte', 'unsigned');
         this.filesNamed = (archiveData.get('byte', 'unsigned') & 0x01) !== 0;
-
         const fileCount = archiveData.get('short', 'unsigned');
+
         const groupIndices: number[] = new Array(fileCount);
         let accumulator = 0;
 
