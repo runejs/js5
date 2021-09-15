@@ -1,4 +1,4 @@
-import { logger } from '@runejs/core';
+import { logger } from '@runejs/common';
 import { Js5Store } from './js5-store';
 import { Js5FileGroup } from './js5-file-group';
 import { Js5File } from './js5-file';

@@ -3,8 +3,7 @@ import path from 'path';
 
 
 const store = new Js5Store({
-    storePath: path.join('..', 'server', 'cache'),
-    configPath: path.join('.', 'config')
+    storePath: path.join('..', 'store')
 });
 
 store.getArchive('anims').decode();

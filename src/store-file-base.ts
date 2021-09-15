@@ -1,9 +1,10 @@
-import { ByteBuffer } from '@runejs/core/buffer';
-import { Xtea, XteaKeys } from '@runejs/core/encryption';
-import { Bzip2, Compression, Gzip } from '@runejs/core/compression';
+import { ByteBuffer } from '@runejs/common/buffer';
+import { Xtea, XteaKeys } from '@runejs/common/encryption';
+import { Bzip2, FileCompression, Gzip } from '@runejs/common/compression';
 import { buf as crc32 } from 'crc-32';
 import { EncryptionMethod, StoreConfig } from './config';
 import { createHash } from 'crypto';
+import { logger } from '@runejs/common';
 
 
 export abstract class StoreFileBase {
@@ -11,7 +12,7 @@ export abstract class StoreFileBase {
     public readonly index: string;
 
     protected _data: ByteBuffer | undefined;
-    protected _compression: Compression;
+    protected _compression: FileCompression;
     protected _compressed: boolean;
     protected _name: string;
     protected _nameHash: number | undefined;
@@ -36,7 +37,7 @@ export abstract class StoreFileBase {
         const decompressedData = this._data;
         let data: ByteBuffer;
 
-        if(this.compression === Compression.uncompressed) {
+        if(this.compression === FileCompression.none) {
             // uncompressed files
             data = new ByteBuffer(decompressedData.length + (versioned ? 7 : 5));
 
@@ -51,7 +52,7 @@ export abstract class StoreFileBase {
         } else {
             // compressed Bzip2 or Gzip file
 
-            const compressedData: ByteBuffer = this.compression === Compression.bzip ?
+            const compressedData: ByteBuffer = this.compression === FileCompression.bzip ?
                 Bzip2.compress(decompressedData) : Gzip.compress(decompressedData);
 
             const compressedLength: number = compressedData.length;
@@ -140,7 +141,7 @@ export abstract class StoreFileBase {
 
             decodedData.readerIndex = readerIndex;
 
-            if(this.compression === Compression.uncompressed) {
+            if(this.compression === FileCompression.none) {
                 // Uncompressed file
                 data = new ByteBuffer(compressedLength);
                 decodedData.copy(data, 0, decodedData.readerIndex, compressedLength);
@@ -158,14 +159,14 @@ export abstract class StoreFileBase {
                 }
 
                 const decompressedData = new ByteBuffer(
-                    this.compression === Compression.bzip ?
+                    this.compression === FileCompression.bzip ?
                         decompressedLength : (decodedData.length - decodedData.readerIndex + 2)
                 );
 
                 decodedData.copy(decompressedData, 0, decodedData.readerIndex);
 
                 try {
-                    data = this.compression === Compression.bzip ?
+                    data = this.compression === FileCompression.bzip ?
                         Bzip2.decompress(decompressedData) : Gzip.decompress(decompressedData);
 
                     decodedData.readerIndex = decodedData.readerIndex + compressedLength;
@@ -180,7 +181,7 @@ export abstract class StoreFileBase {
                         this.version = decodedData.get('short', 'unsigned');
                     }
                 } catch(error) {
-                    // logger.error(error?.message ?? error);
+                    logger.error(`Error decompressing file`, error?.message ?? error);
                 }
             }
         }
@@ -219,11 +220,11 @@ export abstract class StoreFileBase {
         return Number(this.index);
     }
 
-    public get compression(): Compression {
-        return this._compression ?? Compression.uncompressed;
+    public get compression(): FileCompression {
+        return this._compression ?? FileCompression.none;
     }
 
-    public set compression(compression: Compression) {
+    public set compression(compression: FileCompression) {
         this._compression = compression;
     }
 

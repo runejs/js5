@@ -1,19 +1,11 @@
 import * as fs from 'fs';
 import path from 'path';
 import JSON5 from 'json5';
-import { logger } from '@runejs/core';
-import { Xtea, XteaKeys } from '@runejs/core/encryption';
+import { logger } from '@runejs/common';
+import { Xtea, XteaKeys } from '@runejs/common/encryption';
 
 
 export type EncryptionMethod = 'none' | 'xtea';
-
-
-export interface ArchiveContentDetails {
-    encryption?: EncryptionMethod;
-    fileExtension?: string;
-    saveFileNames?: boolean;
-    defaultFileNames?: { [key: string]: number };
-}
 
 
 export interface ArchiveDetails {
@@ -21,7 +13,11 @@ export interface ArchiveDetails {
     name: string;
     format?: number;
     compression: string;
-    content?: ArchiveContentDetails;
+    versioned?: boolean;
+    encryption?: EncryptionMethod;
+    fileExtension?: string;
+    saveFileNames?: boolean;
+    defaultFileNames?: { [key: string]: number };
 }
 
 
@@ -33,10 +29,10 @@ export class StoreConfig {
     public static readonly fileNames: Map<number, string> = new Map<number, string>();
     public static readonly xteaKeys: Map<string, XteaKeys[]> = new Map<string, XteaKeys[]>();
 
-    private static _configPath: string;
+    private static _storePath: string;
 
-    public static register(configPath: string, gameVersion?: number | undefined): void {
-        StoreConfig._configPath = configPath;
+    public static register(storePath: string, gameVersion?: number | undefined): void {
+        StoreConfig._storePath = storePath;
         StoreConfig.gameVersion = gameVersion;
         StoreConfig.loadArchiveConfig();
     }
@@ -72,7 +68,7 @@ export class StoreConfig {
     }
 
     public static getArchiveGroupNames(archiveIndex: string): { [groupName: string]: number } {
-        return StoreConfig.getArchiveDetails(archiveIndex)?.content?.defaultFileNames ?? {};
+        return StoreConfig.getArchiveDetails(archiveIndex)?.defaultFileNames ?? {};
     }
 
     public static getArchiveName(archiveIndex: string): string | undefined {
@@ -111,11 +107,11 @@ export class StoreConfig {
     }
 
     public static loadXteaKeys(): void {
-        Xtea.loadKeys(path.join(StoreConfig.configPath, 'xtea'));
+        Xtea.loadKeys(path.join(StoreConfig.storePath, 'config', 'xtea'));
     }
 
     public static loadFileNames(): void {
-        const configPath = path.join(StoreConfig.configPath, 'name-hashes.json');
+        const configPath = path.join(StoreConfig.storePath, 'config', 'name-hashes.json');
         if(!fs.existsSync(configPath)) {
             logger.error(`Error loading file names: ${configPath} was not found.`);
             return;
@@ -130,7 +126,7 @@ export class StoreConfig {
     }
 
     public static loadArchiveConfig(): void {
-        const configPath = path.join(StoreConfig.configPath, 'archives.json5');
+        const configPath = path.join(StoreConfig.storePath, 'config', 'archives.json5');
         if(!fs.existsSync(configPath)) {
             logger.error(`Error loading archive config: ${configPath} was not found.`);
             return;
@@ -149,8 +145,8 @@ export class StoreConfig {
         }
     }
 
-    public static get configPath(): string {
-        return StoreConfig._configPath;
+    public static get storePath(): string {
+        return StoreConfig._storePath;
     }
 
 }

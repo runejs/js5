@@ -1,9 +1,9 @@
-import { ByteBuffer } from '@runejs/core/buffer';
-import { Compression } from '@runejs/core/compression';
+import { logger } from '@runejs/common';
+import { ByteBuffer } from '@runejs/common/buffer';
+import { FileCompression } from '@runejs/common/compression';
 import { Js5Store } from './js5-store';
 import { Js5Archive } from './js5-archive';
 import { StoreFileBase } from './store-file-base';
-import { logger } from '@runejs/core';
 
 
 export class Js5File extends StoreFileBase {
@@ -33,7 +33,7 @@ export class Js5File extends StoreFileBase {
     }
 
     public decompress(): ByteBuffer | null {
-        const encryption = !this.store.xteaDisabled ? (this.archive?.details?.content?.encryption ?? 'none') : 'none';
+        const encryption = !this.store.xteaDisabled ? (this.archive?.details?.encryption ?? 'none') : 'none';
         return super.decompress(encryption);
     }
 
@@ -117,11 +117,11 @@ export class Js5File extends StoreFileBase {
         return this._data;
     }
 
-    public get compression(): Compression {
-        return this._compression ?? this.archive?.compression ?? Compression.uncompressed;
+    public get compression(): FileCompression {
+        return this._compression ?? this.archive?.compression ?? FileCompression.none;
     }
 
-    public set compression(compression: Compression) {
+    public set compression(compression: FileCompression) {
         this._compression = compression;
     }
 }
