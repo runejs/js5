@@ -27,7 +27,8 @@ export class StoreConfig {
 
     public static readonly archives: Map<string, ArchiveDetails> = new Map<string, ArchiveDetails>();
     public static readonly fileNames: Map<number, string> = new Map<number, string>();
-    public static readonly xteaKeys: Map<string, XteaKeys[]> = new Map<string, XteaKeys[]>();
+
+    public static xteaKeys: Map<string, XteaKeys[]> = new Map<string, XteaKeys[]>();
 
     private static _storePath: string;
 
@@ -107,7 +108,7 @@ export class StoreConfig {
     }
 
     public static loadXteaKeys(): void {
-        Xtea.loadKeys(path.join(StoreConfig.storePath, 'config', 'xtea'));
+        StoreConfig.xteaKeys = Xtea.loadKeys(path.join(StoreConfig.storePath, 'config', 'xtea'));
     }
 
     public static loadFileNames(): void {

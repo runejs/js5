@@ -105,8 +105,12 @@ export abstract class StoreFileBase {
             let keySets: XteaKeys[] = [];
             if(this.name) {
                 const loadedKeys = StoreConfig.getXteaKey(this.name);
-                if(loadedKeys && !Array.isArray(loadedKeys)) {
-                    keySets = [ loadedKeys ];
+                if(loadedKeys) {
+                    if(!Array.isArray(loadedKeys)) {
+                        keySets = [ loadedKeys ];
+                    } else {
+                        keySets = loadedKeys;
+                    }
                 }
             }
 
@@ -128,6 +132,10 @@ export abstract class StoreFileBase {
                 decryptedData.copy(dataCopy, readerIndex, 0);
                 decodedDataSets.push(dataCopy);
             }
+
+            if(!keySets?.length) {
+                decodedDataSets = [ compressedData ];
+            }
         } else {
             decodedDataSets = [ compressedData ];
         }
@@ -135,10 +143,6 @@ export abstract class StoreFileBase {
         let data: ByteBuffer;
 
         for(const decodedData of decodedDataSets) {
-            if(data?.length) {
-                break;
-            }
-
             decodedData.readerIndex = readerIndex;
 
             if(this.compression === FileCompression.none) {
@@ -181,7 +185,7 @@ export abstract class StoreFileBase {
                         this.version = decodedData.get('short', 'unsigned');
                     }
                 } catch(error) {
-                    logger.error(`Error decompressing file`, error?.message ?? error);
+                    logger.error(`Error decompressing file: ${error?.message ?? error}`);
                 }
             }
         }

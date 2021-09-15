@@ -1,6 +1,6 @@
 {
     "name": "@runejs/js5",
-    "version": "1.0.0-rc.5",
+    "version": "1.0.0-rc.6",
     "description": "Tools for working with the JS5 file storage system used by the Java game client.",
     "main": "lib/index.js",
     "types": "lib/index.d.ts",

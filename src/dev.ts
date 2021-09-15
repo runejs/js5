@@ -3,7 +3,8 @@ import path from 'path';
 
 
 const store = new Js5Store({
-    storePath: path.join('..', 'store')
+    storePath: path.join('..', 'store'),
+    gameVersion: 435
 });
 
-store.getArchive('anims').decode();
+store.getArchive('maps').decode();
