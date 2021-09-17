@@ -1,10 +1,10 @@
 import { ByteBuffer } from '@runejs/common/buffer';
 import { Xtea, XteaKeys } from '@runejs/common/encryption';
 import { Bzip2, FileCompression, Gzip } from '@runejs/common/compression';
-import { buf as crc32 } from 'crc-32';
 import { EncryptionMethod, StoreConfig } from './config';
 import { createHash } from 'crypto';
 import { logger } from '@runejs/common';
+import { Crc32 } from './crc32';
 
 
 export abstract class StoreFileBase {
@@ -29,7 +29,7 @@ export abstract class StoreFileBase {
         this._size = 0;
     }
 
-    public compress(versioned: boolean = true): ByteBuffer {
+    public compress(): ByteBuffer {
         if(this.compressed) {
             return this._data;
         }
@@ -39,7 +39,7 @@ export abstract class StoreFileBase {
 
         if(this.compression === FileCompression.none) {
             // uncompressed files
-            data = new ByteBuffer(decompressedData.length + (versioned ? 7 : 5));
+            data = new ByteBuffer(decompressedData.length + 5);
 
             // indicate that no file compression is applied
             data.put(0);
@@ -57,7 +57,7 @@ export abstract class StoreFileBase {
 
             const compressedLength: number = compressedData.length;
 
-            data = new ByteBuffer(compressedData.length + (versioned ? 11 : 9));
+            data = new ByteBuffer(compressedData.length + 9);
 
             // indicate which type of file compression was used (1 or 2)
             data.put(this.compression);
@@ -72,14 +72,8 @@ export abstract class StoreFileBase {
             data.putBytes(compressedData);
         }
 
-        if(data?.length) {
-            if(versioned) {
-                data.put(this.version ?? 0, 'short');
-            }
-
-            this.setData(data.flipWriter(), true);
-            return this._data;
-        }
+        this.setData(data.flipWriter(), true);
+        return this._data;
     }
 
     public decompress(encryption: EncryptionMethod = 'none'): ByteBuffer | null {
@@ -149,11 +143,7 @@ export abstract class StoreFileBase {
                 // Uncompressed file
                 data = new ByteBuffer(compressedLength);
                 decodedData.copy(data, 0, decodedData.readerIndex, compressedLength);
-                decodedData.readerIndex = (decodedData.readerIndex + compressedLength);
-
-                if(decodedData.readable >= 2) {
-                    this.version = decodedData.get('short', 'unsigned');
-                }
+                decodedData.readerIndex = data.readerIndex = (decodedData.readerIndex + compressedLength);
             } else {
                 // Compressed file
                 const decompressedLength = decodedData.get('int', 'unsigned');
@@ -173,24 +163,23 @@ export abstract class StoreFileBase {
                     data = this.compression === FileCompression.bzip ?
                         Bzip2.decompress(decompressedData) : Gzip.decompress(decompressedData);
 
-                    decodedData.readerIndex = decodedData.readerIndex + compressedLength;
+                    decodedData.readerIndex = data.readerIndex = decodedData.readerIndex + compressedLength;
 
                     if(data.length !== decompressedLength) {
                         // logger.error(`Compression length mismatch`);
-                        continue;
-                    }
-
-                    // Read the file footer
-                    if(decodedData.readable >= 2) {
-                        this.version = decodedData.get('short', 'unsigned');
                     }
                 } catch(error) {
-                    logger.error(`Error decompressing file: ${error?.message ?? error}`);
+                    // logger.error(`Error decompressing file: ${error?.message ?? error}`);
                 }
             }
         }
 
         if(data?.length) {
+            // Read the file footer
+            if(data.readable >= 2) {
+                this.version = data.get('short', 'unsigned');
+            }
+
             this.setData(data, false);
             return this._data;
         }
@@ -211,7 +200,7 @@ export abstract class StoreFileBase {
     }
 
     public generateCrc32(): number | undefined {
-        this._crc32 = !this.empty ? crc32(this._data) : undefined;
+        this._crc32 = !this.empty ? Crc32.calculateCrc(0, this.size, this._data) : undefined;
         return this._crc32;
     }
 

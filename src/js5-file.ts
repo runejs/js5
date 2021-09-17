@@ -37,15 +37,21 @@ export class Js5File extends StoreFileBase {
         return super.decompress(encryption);
     }
 
-    public extractPackedFile(indexChannel: ByteBuffer, dataChannel: ByteBuffer): ByteBuffer | null {
+    public extractPackedFile(): ByteBuffer | null {
         const indexDataLength = 6;
 
+        const archiveIndex = this.archive?.index ?? '255';
+        const dataChannel = this.store.packedDataChannel;
+        const indexChannel = archiveIndex === '255' ? this.store.packedMainIndexChannel :
+            this.store.packedIndexChannels.get(archiveIndex);
+
         let pointer = this.numericIndex * indexDataLength;
+
         if(pointer < 0 || pointer >= indexChannel.length) {
             if(this.archive) {
-                logger.error(`File ${this.index} was not found within the packed ${this.archive.name} archive index file.`);
+                // logger.error(`File ${this.index} was not found within the packed ${this.archive.name} archive index file.`);
             } else {
-                logger.error(`File ${this.index} was not found within the provided index file.`);
+                // logger.error(`File ${this.index} was not found within the provided index file.`);
             }
             return null;
         }

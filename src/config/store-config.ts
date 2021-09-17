@@ -60,6 +60,14 @@ export class StoreConfig {
         return keySets;
     }
 
+    public static archiveExists(archiveIndex: string): boolean {
+        if(!StoreConfig.archives.size) {
+            StoreConfig.loadArchiveConfig();
+        }
+
+        return StoreConfig.archives.has(archiveIndex);
+    }
+
     public static getArchiveDetails(archiveIndex: string): ArchiveDetails {
         if(!StoreConfig.archives.size) {
             StoreConfig.loadArchiveConfig();

@@ -4,6 +4,8 @@ import { logger } from '@runejs/common';
 import { ByteBuffer } from '@runejs/common/buffer';
 import { Js5Archive } from './js5-archive';
 import { StoreConfig } from './config';
+import { Crc32 } from './crc32';
+import { Js5File } from './js5-file';
 
 
 export interface Js5StoreOptions {
@@ -18,6 +20,7 @@ export class Js5Store {
     public readonly archives: Map<string, Js5Archive>;
     public readonly config: StoreConfig;
     public readonly storePath: string;
+
     public xteaDisabled: boolean;
 
     private readonly _packedIndexChannels: Map<string, ByteBuffer>;
@@ -34,11 +37,8 @@ export class Js5Store {
         this.archives = new Map<string, Js5Archive>();
         this._packedIndexChannels = new Map<string, ByteBuffer>();
         StoreConfig.register(options.storePath, options.gameVersion);
+        Crc32.generateCrcLookupTable();
         this.readPackedStore();
-    }
-
-    public getArchive(archiveName: string): Js5Archive {
-        return this.archives.get(StoreConfig.getArchiveIndex(archiveName));
     }
 
     public decode(decodeGroups: boolean = true): void {
@@ -79,7 +79,7 @@ export class Js5Store {
         this._packedMainIndexChannel = new ByteBuffer(fs.readFileSync(mainIndexFilePath));
 
         const mainArchive = new Js5Archive(this, 255);
-        this.archives.set('255', mainArchive);
+        this.setArchive(255, mainArchive);
 
         for(const fileName of storeFileNames) {
             if(!fileName?.length || fileName === mainIndexFile || fileName === dataFile) {
@@ -97,10 +97,54 @@ export class Js5Store {
                 logger.error(`Index file ${fileName} does not have a valid extension.`);
             }
 
+            if(!StoreConfig.archiveExists(index)) {
+                logger.warn(`Archive ${index} found, but not configured.`);
+                continue;
+            }
+
             const fileData = new ByteBuffer(fs.readFileSync(path.join(js5StorePath, fileName)));
             this._packedIndexChannels.set(index, fileData);
-            this.archives.set(index, new Js5Archive(this, numericIndex, mainArchive));
+
+            try {
+                const archive = new Js5Archive(this, numericIndex, mainArchive);
+                this.setArchive(index, archive);
+            } catch(error) {
+                logger.error(error);
+            }
         }
+    }
+
+    /**
+     * Adds a new or replaces an existing archive within the file store.
+     * @param archiveIndex The index of the archive to add or change.
+     * @param archive The archive to add or change.
+     */
+    public setArchive(archiveIndex: number | string, archive: Js5Archive): void {
+        if(typeof archiveIndex === 'number') {
+            archiveIndex = String(archiveIndex);
+        }
+
+        this.archives.set(archiveIndex, archive);
+    }
+
+    /**
+     * Fetches an archive from the file store by index.
+     * @param archiveIndex The index of the archive to find.
+     */
+    public getArchive(archiveIndex: number | string): Js5Archive {
+        if(typeof archiveIndex === 'number') {
+            archiveIndex = String(archiveIndex);
+        }
+
+        return this.archives.get(archiveIndex);
+    }
+
+    /**
+     * Fetches an archive from the file store by file name.
+     * @param archiveName The name of the archive to find.
+     */
+    public findArchive(archiveName: string): Js5Archive {
+        return this.archives.get(StoreConfig.getArchiveIndex(archiveName));
     }
 
     public get packedMainIndexChannel(): ByteBuffer {

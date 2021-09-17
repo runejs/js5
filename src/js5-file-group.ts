@@ -23,8 +23,7 @@ export class Js5FileGroup extends Js5File {
         }
 
         if(!this._data?.length) {
-            this.extractPackedFile(this.archive.store.packedIndexChannels.get(this.archive.index),
-                this.archive.store.packedDataChannel);
+            this.extractPackedFile();
         }
 
         if(this.compressed) {
@@ -80,7 +79,6 @@ export class Js5FileGroup extends Js5File {
             for(const [ fileIndex, file ] of this.files) {
                 const fileSize = this._fileSizes.get(fileIndex) || 0;
                 file.setData(new ByteBuffer(fileSize), false);
-                file.size = fileSize;
             }
 
             this._data.readerIndex = 0;
@@ -114,6 +112,18 @@ export class Js5FileGroup extends Js5File {
     }
 
     /**
+     * Fetches the first file from this group.
+     */
+    public getFirstFile(): Js5File {
+        const files = Array.from(this.files.values());
+        if(files?.length) {
+            return files[0];
+        }
+
+        return null;
+    }
+
+    /**
      * Adds a new or replaces an existing file within the group.
      * @param fileIndex The index of the file to add or change.
      * @param file The file to add or change.
@@ -128,6 +138,14 @@ export class Js5FileGroup extends Js5File {
      */
     public getFile(fileIndex: number | string): Js5File | null {
         return this.files.get(typeof fileIndex === 'number' ? String(fileIndex) : fileIndex) ?? null;
+    }
+
+    /**
+     * Fetches a file from this group by file name.
+     * @param fileName The name of the file to find.
+     */
+    public findFile(fileName: string): Js5File {
+        return Array.from(this.files.values()).find(file => file?.name === fileName) ?? null;
     }
 
     public get fileSizes(): Map<string, number> {

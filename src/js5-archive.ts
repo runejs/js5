@@ -17,6 +17,9 @@ export class Js5Archive extends Js5File {
         super(index, js5Store, archive);
         this.groups = new Map<string, Js5FileGroup>();
         this.details = StoreConfig.getArchiveDetails(this.index);
+        if(!this.details) {
+            throw new Error(`Unknown archive index ${index} provided.`);
+        }
     }
 
     public decode(decodeGroups: boolean = true): void {
@@ -29,9 +32,10 @@ export class Js5Archive extends Js5File {
 
         logger.info(`Decoding archive ${this.name}...`);
 
-        this.extractPackedFile(this.store.packedMainIndexChannel, this.store.packedDataChannel);
-
+        this.extractPackedFile();
         this.generateCrc32();
+
+        logger.info(`Archive ${this.index} calculated checksum: ${this.crc32}`);
 
         const archiveData = this.decompress();
 
@@ -157,6 +161,14 @@ export class Js5Archive extends Js5File {
      */
     public getGroup(fileIndex: number | string): Js5FileGroup {
         return this.groups.get(typeof fileIndex === 'number' ? String(fileIndex) : fileIndex);
+    }
+
+    /**
+     * Fetches a group from this archive by file name.
+     * @param fileName The name of the group to find.
+     */
+    public findGroup(fileName: string): Js5FileGroup {
+        return Array.from(this.groups.values()).find(group => group?.name === fileName) ?? null;
     }
 
     public get format(): number {
