@@ -8,12 +8,12 @@ const store = new Js5Store({
     gameVersion: 435
 });
 
-store.decode();
+// store.decode();
 
-/*const binaryArchive = store.getArchive('binary');
+const binaryArchive = store.findArchive('binary');
 binaryArchive.decode();
 
-const titleJpg = binaryArchive.findGroup('title.jpg');
+/*const titleJpg = binaryArchive.findGroup('title.jpg');
 
 console.log(titleJpg.crc32);
 

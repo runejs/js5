@@ -143,7 +143,12 @@ export abstract class StoreFileBase {
                 // Uncompressed file
                 data = new ByteBuffer(compressedLength);
                 decodedData.copy(data, 0, decodedData.readerIndex, compressedLength);
-                decodedData.readerIndex = data.readerIndex = (decodedData.readerIndex + compressedLength);
+                decodedData.readerIndex = (decodedData.readerIndex + compressedLength);
+
+                // Read the file footer
+                if(decodedData.readable >= 2) {
+                    this.version = decodedData.get('short', 'unsigned');
+                }
             } else {
                 // Compressed file
                 const decompressedLength = decodedData.get('int', 'unsigned');
@@ -163,10 +168,15 @@ export abstract class StoreFileBase {
                     data = this.compression === FileCompression.bzip ?
                         Bzip2.decompress(decompressedData) : Gzip.decompress(decompressedData);
 
-                    decodedData.readerIndex = data.readerIndex = decodedData.readerIndex + compressedLength;
+                    decodedData.readerIndex = decodedData.readerIndex + compressedLength;
 
                     if(data.length !== decompressedLength) {
                         // logger.error(`Compression length mismatch`);
+                    }
+
+                    // Read the file footer
+                    if(decodedData.readable >= 2) {
+                        this.version = decodedData.get('short', 'unsigned');
                     }
                 } catch(error) {
                     // logger.error(`Error decompressing file: ${error?.message ?? error}`);
@@ -175,11 +185,6 @@ export abstract class StoreFileBase {
         }
 
         if(data?.length) {
-            // Read the file footer
-            if(data.readable >= 2) {
-                this.version = data.get('short', 'unsigned');
-            }
-
             this.setData(data, false);
             return this._data;
         }
