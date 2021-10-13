@@ -1,17 +1,24 @@
 import path from 'path';
 import { Js5Store } from './js5-store';
-import { Crc32 } from './crc32';
 
 
 const store = new Js5Store({
     storePath: path.join('..', 'store'),
-    gameVersion: 435
+    gameVersion: 462,
+    // gameVersion: 435,
 });
 
-// store.decode();
+store.decode();
 
-const binaryArchive = store.findArchive('binary');
-binaryArchive.decode();
+const mapsArchive = store.findArchive('maps');
+
+// mapsArchive.decode();
+
+const landscape = mapsArchive.findGroup('l32_58');
+console.log(landscape.encoded);
+
+// const binaryArchive = store.findArchive('binary');
+// binaryArchive.decode();
 
 /*const titleJpg = binaryArchive.findGroup('title.jpg');
 

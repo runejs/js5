@@ -27,7 +27,7 @@ export class Js5FileGroup extends Js5File {
         }
 
         if(this.compressed) {
-            this.decompress();
+            super.decompress();
         }
 
         this.generateSha256();
@@ -79,6 +79,7 @@ export class Js5FileGroup extends Js5File {
             for(const [ fileIndex, file ] of this.files) {
                 const fileSize = this._fileSizes.get(fileIndex) || 0;
                 file.setData(new ByteBuffer(fileSize), false);
+                file.size = fileSize;
             }
 
             this._data.readerIndex = 0;
@@ -150,10 +151,6 @@ export class Js5FileGroup extends Js5File {
 
     public get fileSizes(): Map<string, number> {
         return this._fileSizes;
-    }
-
-    public get stripeCount(): number {
-        return this._stripeCount;
     }
 
     public get encoded(): boolean {

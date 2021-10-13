@@ -3,11 +3,13 @@ import { Xtea, XteaKeys } from '@runejs/common/encryption';
 import { Bzip2, FileCompression, Gzip } from '@runejs/common/compression';
 import { EncryptionMethod, StoreConfig } from './config';
 import { createHash } from 'crypto';
-import { logger } from '@runejs/common';
 import { Crc32 } from './crc32';
+import { logger } from '@runejs/common';
 
 
 export abstract class StoreFileBase {
+
+    private static xteaWarningDisplayed = false;
 
     public readonly index: string;
 
@@ -76,26 +78,25 @@ export abstract class StoreFileBase {
         return this._data;
     }
 
-    public decompress(encryption: EncryptionMethod = 'none'): ByteBuffer | null {
+    public decompress(encryption: EncryptionMethod = 'none', gameVersion?: number | undefined): ByteBuffer | null {
         if(!this.compressed) {
             return this._data;
         }
 
-        const compressedData = this._data;
-
-        if(!compressedData?.length) {
+        if(!this._data?.length) {
             return null;
         }
 
-        compressedData.readerIndex = 0;
+        this._data.readerIndex = 0;
 
-        this.compression = compressedData.get('byte', 'unsigned');
-        const compressedLength = compressedData.get('int', 'unsigned');
+        this.compression = this._data.get('byte', 'unsigned');
+        const compressedLength = this._data.get('int', 'unsigned');
 
-        const readerIndex = compressedData.readerIndex;
-        let decodedDataSets: ByteBuffer[] = [];
+        const readerIndex = this._data.readerIndex;
+        let compressedData: ByteBuffer = this._data;
+        let keysFound = false;
 
-        if(encryption === 'xtea') {
+        if(encryption === 'xtea' && gameVersion) {
             let keySets: XteaKeys[] = [];
             if(this.name) {
                 const loadedKeys = StoreConfig.getXteaKey(this.name);
@@ -108,100 +109,107 @@ export abstract class StoreFileBase {
                 }
             }
 
-            for(const keys of keySets) {
-                if(!Xtea.validKeys(keys.key)) {
-                    continue;
-                }
+            const keySet = keySets.find(keySet => keySet.gameVersion === gameVersion);
+            const decryptedData = this.decrypt(readerIndex, compressedLength, keySet);
 
-                const dataCopy = new ByteBuffer(compressedData.length);
-                compressedData.copy(dataCopy, 0, 0);
-                dataCopy.readerIndex = readerIndex;
-
-                let lengthOffset = readerIndex;
-                if(dataCopy.length - (compressedLength + readerIndex + 4) >= 2) {
-                    lengthOffset += 2;
-                }
-
-                const decryptedData = Xtea.decrypt(dataCopy, keys.key, dataCopy.length - lengthOffset);
-                decryptedData.copy(dataCopy, readerIndex, 0);
-                decodedDataSets.push(dataCopy);
+            if(decryptedData) {
+                keysFound = true;
+                compressedData = decryptedData;
             }
-
-            if(!keySets?.length) {
-                decodedDataSets = [ compressedData ];
-            }
-        } else {
-            decodedDataSets = [ compressedData ];
+        } else if(encryption === 'xtea' && !gameVersion && !StoreFileBase.xteaWarningDisplayed) {
+            logger.warn(`Game version must be supplied to decompress XTEA encrypted files.`,
+                `Please provide the JS5 file store game version using the --version ### argument.`);
+            StoreFileBase.xteaWarningDisplayed = true;
         }
 
         let data: ByteBuffer;
 
-        for(const decodedData of decodedDataSets) {
-            decodedData.readerIndex = readerIndex;
+        compressedData.readerIndex = readerIndex;
 
-            if(this.compression === FileCompression.none) {
-                // Uncompressed file
-                data = new ByteBuffer(compressedLength);
-                decodedData.copy(data, 0, decodedData.readerIndex, compressedLength);
-                decodedData.readerIndex = (decodedData.readerIndex + compressedLength);
+        if(this.compression === FileCompression.none) {
+            // Uncompressed file
+            data = new ByteBuffer(compressedLength);
+            compressedData.copy(data, 0, compressedData.readerIndex, compressedLength);
+            compressedData.readerIndex = (compressedData.readerIndex + compressedLength);
+        } else {
+            // Compressed file
 
-                // Read the file footer
-                if(decodedData.readable >= 2) {
-                    this.version = decodedData.get('short', 'unsigned');
-                }
-            } else {
-                // Compressed file
-                const decompressedLength = decodedData.get('int', 'unsigned');
+            try {
+                const decompressedLength = compressedData.get('int', 'unsigned');
                 if(decompressedLength < 0) {
-                    // logger.error(`Invalid file length - missing XTEA keys?`);
-                    continue;
+                    throw new Error(encryption === 'xtea' && !keysFound ? `Missing or invalid XTEA key.` :
+                        `Invalid decompressed file length: ${decompressedLength}`);
                 }
 
                 const decompressedData = new ByteBuffer(
                     this.compression === FileCompression.bzip ?
-                        decompressedLength : (decodedData.length - decodedData.readerIndex + 2)
+                        decompressedLength : (compressedData.length - compressedData.readerIndex + 2)
                 );
 
-                decodedData.copy(decompressedData, 0, decodedData.readerIndex);
+                compressedData.copy(decompressedData, 0, compressedData.readerIndex);
 
-                try {
-                    data = this.compression === FileCompression.bzip ?
-                        Bzip2.decompress(decompressedData) : Gzip.decompress(decompressedData);
+                data = this.compression === FileCompression.bzip ?
+                    Bzip2.decompress(decompressedData) : Gzip.decompress(decompressedData);
 
-                    decodedData.readerIndex = decodedData.readerIndex + compressedLength;
+                compressedData.readerIndex = compressedData.readerIndex + compressedLength;
 
-                    if(data.length !== decompressedLength) {
-                        // logger.error(`Compression length mismatch`);
-                    }
-
-                    // Read the file footer
-                    if(decodedData.readable >= 2) {
-                        this.version = decodedData.get('short', 'unsigned');
-                    }
-                } catch(error) {
-                    // logger.error(`Error decompressing file: ${error?.message ?? error}`);
+                if(data.length !== decompressedLength) {
+                    throw new Error(`Compression length mismatch.`);
                 }
+            } catch(error) {
+                logger.error(`Error decompressing file ${this._name}: ${error?.message ?? error}`);
+                data = null;
             }
         }
 
-        if(data?.length) {
-            this.setData(data, false);
-            return this._data;
+        // Read the file footer
+        if(compressedData.readable >= 2) {
+            this.version = compressedData.get('short', 'unsigned');
         }
 
-        return null;
+        if((data?.length ?? 0) > 0) {
+            this.setData(data, false);
+        } else {
+            this.setData(new ByteBuffer([]), false);
+        }
+
+        return this._data;
     }
 
     public setData(data: ByteBuffer, compressed: boolean): void {
-        if(data?.length) {
+        if(data) {
             data.readerIndex = 0;
             data.writerIndex = 0;
             this._data = data;
         } else {
-            this._data = null;
+            this._data = new ByteBuffer([]);
         }
+
         this._compressed = compressed;
-        this._size = data?.length ?? 0;
+        this._size = data.length;
+    }
+
+    public decrypt(readerIndex: number, compressedLength: number, keySet: XteaKeys): ByteBuffer | null {
+        if(!keySet?.key || !Xtea.validKeys(keySet.key)) {
+            return null;
+        }
+
+        const dataCopy = this._data.clone();
+        dataCopy.readerIndex = readerIndex;
+
+        let lengthOffset = readerIndex;
+        if(dataCopy.length - (compressedLength + readerIndex + 4) >= 2) {
+            lengthOffset += 2;
+        }
+
+        const decryptedData = Xtea.decrypt(dataCopy, keySet.key, dataCopy.length - lengthOffset);
+
+        if(decryptedData.length >= 5) {
+            decryptedData.copy(dataCopy, readerIndex, 0);
+            return dataCopy;
+        }
+
+        return null;
     }
 
     public generateCrc32(): number | undefined {

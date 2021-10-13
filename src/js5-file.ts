@@ -4,6 +4,7 @@ import { FileCompression } from '@runejs/common/compression';
 import { Js5Store } from './js5-store';
 import { Js5Archive } from './js5-archive';
 import { StoreFileBase } from './store-file-base';
+import { StoreConfig } from './config';
 
 
 export class Js5File extends StoreFileBase {
@@ -32,9 +33,9 @@ export class Js5File extends StoreFileBase {
         this._name = this.index;
     }
 
-    public decompress(): ByteBuffer | null {
+    public override decompress(): ByteBuffer | null {
         const encryption = !this.store.xteaDisabled ? (this.archive?.details?.encryption ?? 'none') : 'none';
-        return super.decompress(encryption);
+        return super.decompress(encryption, StoreConfig.gameVersion);
     }
 
     public extractPackedFile(): ByteBuffer | null {
@@ -49,9 +50,9 @@ export class Js5File extends StoreFileBase {
 
         if(pointer < 0 || pointer >= indexChannel.length) {
             if(this.archive) {
-                // logger.error(`File ${this.index} was not found within the packed ${this.archive.name} archive index file.`);
+                logger.error(`File ${this.index} was not found within the packed ${this.archive.name} archive index file.`);
             } else {
-                // logger.error(`File ${this.index} was not found within the provided index file.`);
+                logger.error(`File ${this.index} was not found within the provided index file.`);
             }
             return null;
         }
@@ -88,7 +89,8 @@ export class Js5File extends StoreFileBase {
             const nextStripe = temp.get('int24', 'unsigned');
             const stripeArchiveIndex = temp.get('byte', 'unsigned');
             const stripeData = new ByteBuffer(stripeDataLength);
-            temp.copy(stripeData, 0, temp.readerIndex, temp.readerIndex + stripeDataLength);
+            temp.copy(stripeData, 0, temp.readerIndex,
+                temp.readerIndex + stripeDataLength);
 
             if(remaining > stripeDataLength) {
                 stripeData.copy(data, data.writerIndex, 0, stripeDataLength);
@@ -123,11 +125,11 @@ export class Js5File extends StoreFileBase {
         return this._data;
     }
 
-    public get compression(): FileCompression {
+    public override get compression(): FileCompression {
         return this._compression ?? this.archive?.compression ?? FileCompression.none;
     }
 
-    public set compression(compression: FileCompression) {
+    public override set compression(compression: FileCompression) {
         this._compression = compression;
     }
 }
